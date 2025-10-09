@@ -74,9 +74,17 @@ public class MainView extends BorderPane {
         AppState.get().currentSwimmerProperty().addListener((obs, o, s) -> setCurrentSwimmer(s));
         AppState.get().currentWorkoutProperty().addListener((obs, o, w) -> setWorkout(w));
 
-        setLeft(leftPane);
-        setCenter(centerPane);
-        setRight(seedPane);
+        // Put left + right into a resizable SplitPane
+        SplitPane body = new SplitPane();
+        body.getItems().addAll(leftPane, seedPane);
+        body.setDividerPositions(0.70); // ~70% left, 30% right (tweak as you like)
+
+        // Optional: minimum widths so neither side collapses
+        leftPane.setMinWidth(420);
+        seedPane.setMinWidth(300);
+
+        setCenter(body);        // <- single center node
+        // keep the preview at the bottom (already set in buildRightPane)
 
         setPadding(new Insets(8));
         refreshHeader();
@@ -184,6 +192,8 @@ public class MainView extends BorderPane {
 
     private void buildRightPane() {
         seedPane = new SeedGridPane();
+        seedPane.setStyle("-fx-border-color: #999; -fx-border-width: 1; -fx-background-color: rgba(0,0,0,0.02);");
+        seedPane.setMinWidth(300);  // ensures it’s not squeezed to 0
         seedPane.setOnSeedsSaved(() -> {
             // when seeds change, recompute header timings
             refreshHeader();

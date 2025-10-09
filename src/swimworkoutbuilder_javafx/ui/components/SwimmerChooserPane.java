@@ -1,179 +1,113 @@
 package swimworkoutbuilder_javafx.ui.components;
 
+import javafx.beans.binding.Bindings;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
-import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.util.Callback;
 import javafx.util.StringConverter;
 
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.state.AppState;
-import swimworkoutbuilder_javafx.store.LocalStore;
-import swimworkoutbuilder_javafx.ui.dialogs.SwimmerFormDialog;
+import swimworkoutbuilder_javafx.ui.swimmers.SwimmerBarPresenter;
 
-import java.util.ArrayList;
-import java.util.List;
+public final class SwimmerChooserPane extends HBox {
 
-public class SwimmerChooserPane extends HBox {
+    private final ComboBox<Swimmer> combo = new ComboBox<>();
+    private final Button btnAdd    = new Button("Add");
+    private final Button btnEdit   = new Button("Edit");
+    private final Button btnDelete = new Button("Delete");
 
-    private final Label lbl = new Label("Swimmer:");
-    private final ComboBox<Swimmer> cb = new ComboBox<>();
-
-    // Synthetic "add new" sentinel (never saved)
-    private final Swimmer ADD_NEW = new Swimmer("➕ Add New Swimmer…", " ", null, null);
+    private final SwimmerBarPresenter presenter;
 
     public SwimmerChooserPane() {
-        super(8);
+        this(new SwimmerBarPresenter(AppState.get()));
+    }
+
+    public SwimmerChooserPane(SwimmerBarPresenter presenter) {
+        this.presenter = presenter;
+        buildUI();
+        bind();
+        wire();
+        prettyPrintNames(); // <- ensure human-readable names
+    }
+
+    private void buildUI() {
         setAlignment(Pos.CENTER_LEFT);
-        setPadding(new Insets(6, 8, 6, 8));
+        setSpacing(8);
+        setPadding(new Insets(8));
 
-        lbl.setPadding(new Insets(0, 6, 0, 0));
-        cb.setPrefWidth(300);
+        Label lbl = new Label("Swimmer:");
+        combo.setMaxWidth(Double.MAX_VALUE);
+        combo.setVisibleRowCount(10);
 
-        cb.setConverter(new StringConverter<>() {
-            @Override public String toString(Swimmer s) {
-                if (s == null) return "";
-                if (s == ADD_NEW) return "➕ Add New Swimmer…";
-                String team = (s.getTeamName()==null || s.getTeamName().isBlank()) ? "" : " ("+s.getTeamName()+")";
-                return s.getFirstName() + " " + s.getLastName() + team;
-            }
-            @Override public Swimmer fromString(String s) { return null; }
+        // stop buttons shrinking to “...”
+        btnAdd.setMinWidth(60);
+        btnEdit.setMinWidth(60);
+        btnDelete.setMinWidth(70);
+
+        HBox.setHgrow(combo, Priority.ALWAYS);
+        getChildren().addAll(lbl, combo, btnAdd, btnEdit, btnDelete);
+    }
+
+    private void bind() {
+        combo.setItems(presenter.swimmers());
+
+        // Safer than bindBidirectional for some SDK/IDE combos
+        presenter.selectedProperty().addListener((o, oldS, newS) -> {
+            if (combo.getValue() != newS) combo.setValue(newS);
         });
+        combo.valueProperty().addListener((o, oldS, newS) -> {
+            if (presenter.selectedProperty().get() != newS) presenter.selectedProperty().set(newS);
+        });
+        // (If you prefer, this utility also works:)
+        // Bindings.bindBidirectional(combo.valueProperty(), presenter.selectedProperty());
 
-        // Button cell text
-        cb.setButtonCell(new ListCell<>() {
+        btnEdit.disableProperty().bind(combo.valueProperty().isNull());
+        btnDelete.disableProperty().bind(combo.valueProperty().isNull());
+    }
+
+    private void wire() {
+        btnAdd.setOnAction(e -> presenter.addNew());
+        btnEdit.setOnAction(e -> presenter.editSelected());
+        btnDelete.setOnAction(e -> presenter.deleteSelected());
+    }
+
+    /** Force human-readable names in BOTH the drop-down and the closed button cell. */
+    private void prettyPrintNames() {
+        // When the combo is closed
+        combo.setButtonCell(new ListCell<>() {
             @Override protected void updateItem(Swimmer s, boolean empty) {
                 super.updateItem(s, empty);
-                setText(empty || s == null ? "" : cb.getConverter().toString(s));
+                setText(empty || s == null ? "" : displayName(s));
             }
         });
 
-        // List cell with robust context menu
-        cb.setCellFactory(v -> {
-            ListCell<Swimmer> cell = new ListCell<>() {
-                @Override protected void updateItem(Swimmer s, boolean empty) {
-                    super.updateItem(s, empty);
-                    if (empty || s == null) { setText(null); setContextMenu(null); return; }
-                    setText(cb.getConverter().toString(s));
-
-                    if (s == ADD_NEW) { setContextMenu(null); return; }
-
-                    MenuItem miEdit = new MenuItem("Edit swimmer…");
-                    miEdit.setOnAction(e -> editSwimmerInPlace(s));
-
-                    MenuItem miDelete = new MenuItem("Delete swimmer…");
-                    miDelete.setOnAction(e -> confirmDeleteSwimmer(s));
-
-                    ContextMenu cm = new ContextMenu(miEdit, miDelete);
-                    setContextMenu(cm);
-                }
-            };
-
-            // Left click selects
-            cell.setOnMouseClicked(me -> {
-                if (me.getButton() == MouseButton.PRIMARY && !cell.isEmpty()) {
-                    cb.getSelectionModel().select(cell.getItem());
-                }
-            });
-
-            // Right-click / context request: ensure row is selected, then show menu
-            cell.setOnContextMenuRequested(ev -> {
-                if (cell.isEmpty()) return;
-                cb.getSelectionModel().select(cell.getItem());
-                if (cell.getContextMenu() != null) {
-                    cell.getContextMenu().show(cell, ev.getScreenX(), ev.getScreenY());
-                    ev.consume();
-                }
-            });
-
-            return cell;
-        });
-
-        // Populate list from disk (ADD_NEW first)
-        List<Swimmer> swimmers = new ArrayList<>();
-        swimmers.add(ADD_NEW);
-        swimmers.addAll(LocalStore.listSwimmers());
-        cb.getItems().setAll(swimmers);
-
-        // Selection behavior
-        cb.setOnAction(e -> {
-            Swimmer sel = cb.getSelectionModel().getSelectedItem();
-            if (sel == null) return;
-
-            if (sel == ADD_NEW) {
-                var created = SwimmerFormDialog.show();
-                if (created != null) {
-                    try { LocalStore.saveSwimmer(created); } catch (Exception ignored) {}
-                    var items = new ArrayList<>(cb.getItems());
-                    items.add(1, created);
-                    cb.getItems().setAll(items);
-                    cb.getSelectionModel().select(created);
-                    AppState.get().setCurrentSwimmer(created);
-                } else {
-                    var current = AppState.get().getCurrentSwimmer();
-                    if (current != null) cb.getSelectionModel().select(current);
-                    else cb.getSelectionModel().clearSelection();
-                }
-                return;
+        // In the drop-down list
+        combo.setCellFactory(new Callback<>() {
+            @Override public ListCell<Swimmer> call(ListView<Swimmer> lv) {
+                return new ListCell<>() {
+                    @Override protected void updateItem(Swimmer s, boolean empty) {
+                        super.updateItem(s, empty);
+                        setText(empty || s == null ? "" : displayName(s));
+                    }
+                };
             }
-            AppState.get().setCurrentSwimmer(sel);
         });
 
-        // Keep chooser synced if current swimmer changes elsewhere
-        AppState.get().currentSwimmerProperty().addListener((obs, o, s) -> {
-            if (s == null) return;
-            if (!cb.getItems().contains(s)) cb.getItems().add(s);
-            cb.getSelectionModel().select(s);
+        // Extra belt-and-suspenders for some JavaFX builds
+        combo.setConverter(new StringConverter<>() {
+            @Override public String toString(Swimmer s) { return s == null ? "" : displayName(s); }
+            @Override public Swimmer fromString(String str) { return combo.getItems().stream()
+                    .filter(sw -> displayName(sw).equals(str)).findFirst().orElse(null); }
         });
-
-        // Initial selection: use resumed state if present
-        var cur = AppState.get().getCurrentSwimmer();
-        if (cur != null) cb.getSelectionModel().select(cur);
-        else if (swimmers.size() > 1) cb.getSelectionModel().select(1);
-        else cb.getSelectionModel().select(ADD_NEW);
-
-        getChildren().addAll(lbl, cb);
     }
 
-    private void editSwimmerInPlace(Swimmer s) {
-        var updated = SwimmerFormDialog.show(s);
-        if (updated != null) {
-            try { LocalStore.saveSwimmer(updated); } catch (Exception ignored) {}
-            // Replace list item text by re-setting the items (forces cell refresh)
-            var items = new ArrayList<>(cb.getItems());
-            int idx = items.indexOf(s);
-            if (idx >= 0) items.set(idx, updated);
-            cb.getItems().setAll(items);
-            if (s.equals(AppState.get().getCurrentSwimmer())) {
-                AppState.get().setCurrentSwimmer(updated);
-            }
-            cb.getSelectionModel().select(updated);
-        }
-    }
-
-    private void confirmDeleteSwimmer(Swimmer s) {
-        Alert a = new Alert(Alert.AlertType.CONFIRMATION,
-                "Delete swimmer \"" + s.getFirstName() + " " + s.getLastName() + "\"?\n" +
-                        "This will also delete their saved workouts.",
-                ButtonType.CANCEL, ButtonType.OK);
-        a.setHeaderText("Delete swimmer");
-        a.showAndWait().ifPresent(bt -> {
-            if (bt == ButtonType.OK) {
-                LocalStore.deleteSwimmer(s.getId());
-                if (s.equals(AppState.get().getCurrentSwimmer())) {
-                    AppState.get().setCurrentSwimmer(null);
-                    AppState.get().setCurrentWorkout(null);
-                }
-                cb.getItems().remove(s);
-                if (cb.getItems().size() > 1) {
-                    cb.getSelectionModel().select(
-                            cb.getItems().get(0) == ADD_NEW ? cb.getItems().get(1) : cb.getItems().get(0)
-                    );
-                } else {
-                    cb.getSelectionModel().select(ADD_NEW);
-                }
-            }
-        });
+    private static String displayName(Swimmer s) {
+        String base = (s.getFirstName() + " " + s.getLastName()).trim();
+        String pref = s.getPreferredName();
+        return (pref == null || pref.isBlank()) ? base : pref + " (" + base + ")";
     }
 }
