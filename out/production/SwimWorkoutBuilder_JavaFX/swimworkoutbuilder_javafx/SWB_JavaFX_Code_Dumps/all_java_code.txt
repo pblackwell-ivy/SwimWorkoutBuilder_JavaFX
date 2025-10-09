@@ -1,0 +1,4066 @@
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./ui/shell/ActionBar.java
+package swimworkoutbuilder_javafx.ui.shell;
+
+import javafx.geometry.Insets;
+import javafx.scene.Node;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.state.AppState;
+import swimworkoutbuilder_javafx.store.LocalStore;
+import swimworkoutbuilder_javafx.ui.dialogs.LoadWorkoutDialog;
+import swimworkoutbuilder_javafx.ui.dialogs.WorkoutFormDialog;
+
+public class ActionBar {
+
+    private final HBox root = new HBox(10);
+    private final Button btnNewWorkout  = new Button("+ New Workout");
+    private final Button btnLoadWorkout = new Button("📁 Load Workout");
+    private final Button btnPrint       = new Button("⎙ Print");
+
+    public ActionBar() {
+        root.setPadding(new Insets(8, 12, 8, 12));
+
+        // Left-side action buttons only (no swimmer chooser here anymore)
+        root.getChildren().addAll(btnNewWorkout, btnLoadWorkout, btnPrint);
+
+        // Spacer to keep room on the right if needed later
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        root.getChildren().add(spacer);
+
+        btnNewWorkout.setOnAction(e -> {
+            Swimmer cur = AppState.get().getCurrentSwimmer();
+            if (cur == null) {
+                new Alert(Alert.AlertType.INFORMATION, "Choose or create a swimmer first.").showAndWait();
+                return;
+            }
+            Workout w = WorkoutFormDialog.show(cur.getId(), null);
+            if (w != null) {
+                try { LocalStore.saveWorkout(w); } catch (Exception ignored) {}
+                AppState.get().setCurrentWorkout(w);
+            }
+        });
+
+        btnLoadWorkout.setOnAction(e -> {
+            Swimmer cur = AppState.get().getCurrentSwimmer();
+            if (cur == null) {
+                new Alert(Alert.AlertType.INFORMATION, "Choose or create a swimmer first.").showAndWait();
+                return;
+            }
+            var w = LoadWorkoutDialog.show(cur.getId());
+            if (w != null) AppState.get().setCurrentWorkout(w);
+        });
+
+        btnPrint.setOnAction(e ->
+                new Alert(Alert.AlertType.INFORMATION, "Print Preview: coming soon.").showAndWait()
+        );
+
+        // Enable/disable by state
+        AppState.get().currentSwimmerProperty().addListener((obs, o, s) -> {
+            btnNewWorkout.setDisable(s == null);
+            btnLoadWorkout.setDisable(s == null);
+            btnPrint.setDisable(AppState.get().getCurrentWorkout() == null);
+        });
+        AppState.get().currentWorkoutProperty().addListener((obs, o, w) ->
+                btnPrint.setDisable(w == null)
+        );
+
+        // Initial state
+        btnNewWorkout.setDisable(AppState.get().getCurrentSwimmer() == null);
+        btnLoadWorkout.setDisable(AppState.get().getCurrentSwimmer() == null);
+        btnPrint.setDisable(AppState.get().getCurrentWorkout() == null);
+    }
+
+    public Node node() { return root; }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./ui/components/SwimmerChooserPane.java
+package swimworkoutbuilder_javafx.ui.components;
+
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.*;
+import javafx.scene.input.MouseButton;
+import javafx.scene.layout.HBox;
+import javafx.util.StringConverter;
+
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.state.AppState;
+import swimworkoutbuilder_javafx.store.LocalStore;
+import swimworkoutbuilder_javafx.ui.dialogs.SwimmerFormDialog;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class SwimmerChooserPane extends HBox {
+
+    private final Label lbl = new Label("Swimmer:");
+    private final ComboBox<Swimmer> cb = new ComboBox<>();
+
+    // Synthetic "add new" sentinel (never saved)
+    private final Swimmer ADD_NEW = new Swimmer("➕ Add New Swimmer…", " ", null, null);
+
+    public SwimmerChooserPane() {
+        super(8);
+        setAlignment(Pos.CENTER_LEFT);
+        setPadding(new Insets(6, 8, 6, 8));
+
+        lbl.setPadding(new Insets(0, 6, 0, 0));
+        cb.setPrefWidth(300);
+
+        cb.setConverter(new StringConverter<>() {
+            @Override public String toString(Swimmer s) {
+                if (s == null) return "";
+                if (s == ADD_NEW) return "➕ Add New Swimmer…";
+                String team = (s.getTeamName()==null || s.getTeamName().isBlank()) ? "" : " ("+s.getTeamName()+")";
+                return s.getFirstName() + " " + s.getLastName() + team;
+            }
+            @Override public Swimmer fromString(String s) { return null; }
+        });
+
+        // Button cell text
+        cb.setButtonCell(new ListCell<>() {
+            @Override protected void updateItem(Swimmer s, boolean empty) {
+                super.updateItem(s, empty);
+                setText(empty || s == null ? "" : cb.getConverter().toString(s));
+            }
+        });
+
+        // List cell with robust context menu
+        cb.setCellFactory(v -> {
+            ListCell<Swimmer> cell = new ListCell<>() {
+                @Override protected void updateItem(Swimmer s, boolean empty) {
+                    super.updateItem(s, empty);
+                    if (empty || s == null) { setText(null); setContextMenu(null); return; }
+                    setText(cb.getConverter().toString(s));
+
+                    if (s == ADD_NEW) { setContextMenu(null); return; }
+
+                    MenuItem miEdit = new MenuItem("Edit swimmer…");
+                    miEdit.setOnAction(e -> editSwimmerInPlace(s));
+
+                    MenuItem miDelete = new MenuItem("Delete swimmer…");
+                    miDelete.setOnAction(e -> confirmDeleteSwimmer(s));
+
+                    ContextMenu cm = new ContextMenu(miEdit, miDelete);
+                    setContextMenu(cm);
+                }
+            };
+
+            // Left click selects
+            cell.setOnMouseClicked(me -> {
+                if (me.getButton() == MouseButton.PRIMARY && !cell.isEmpty()) {
+                    cb.getSelectionModel().select(cell.getItem());
+                }
+            });
+
+            // Right-click / context request: ensure row is selected, then show menu
+            cell.setOnContextMenuRequested(ev -> {
+                if (cell.isEmpty()) return;
+                cb.getSelectionModel().select(cell.getItem());
+                if (cell.getContextMenu() != null) {
+                    cell.getContextMenu().show(cell, ev.getScreenX(), ev.getScreenY());
+                    ev.consume();
+                }
+            });
+
+            return cell;
+        });
+
+        // Populate list from disk (ADD_NEW first)
+        List<Swimmer> swimmers = new ArrayList<>();
+        swimmers.add(ADD_NEW);
+        swimmers.addAll(LocalStore.listSwimmers());
+        cb.getItems().setAll(swimmers);
+
+        // Selection behavior
+        cb.setOnAction(e -> {
+            Swimmer sel = cb.getSelectionModel().getSelectedItem();
+            if (sel == null) return;
+
+            if (sel == ADD_NEW) {
+                var created = SwimmerFormDialog.show();
+                if (created != null) {
+                    try { LocalStore.saveSwimmer(created); } catch (Exception ignored) {}
+                    var items = new ArrayList<>(cb.getItems());
+                    items.add(1, created);
+                    cb.getItems().setAll(items);
+                    cb.getSelectionModel().select(created);
+                    AppState.get().setCurrentSwimmer(created);
+                } else {
+                    var current = AppState.get().getCurrentSwimmer();
+                    if (current != null) cb.getSelectionModel().select(current);
+                    else cb.getSelectionModel().clearSelection();
+                }
+                return;
+            }
+            AppState.get().setCurrentSwimmer(sel);
+        });
+
+        // Keep chooser synced if current swimmer changes elsewhere
+        AppState.get().currentSwimmerProperty().addListener((obs, o, s) -> {
+            if (s == null) return;
+            if (!cb.getItems().contains(s)) cb.getItems().add(s);
+            cb.getSelectionModel().select(s);
+        });
+
+        // Initial selection: use resumed state if present
+        var cur = AppState.get().getCurrentSwimmer();
+        if (cur != null) cb.getSelectionModel().select(cur);
+        else if (swimmers.size() > 1) cb.getSelectionModel().select(1);
+        else cb.getSelectionModel().select(ADD_NEW);
+
+        getChildren().addAll(lbl, cb);
+    }
+
+    private void editSwimmerInPlace(Swimmer s) {
+        var updated = SwimmerFormDialog.show(s);
+        if (updated != null) {
+            try { LocalStore.saveSwimmer(updated); } catch (Exception ignored) {}
+            // Replace list item text by re-setting the items (forces cell refresh)
+            var items = new ArrayList<>(cb.getItems());
+            int idx = items.indexOf(s);
+            if (idx >= 0) items.set(idx, updated);
+            cb.getItems().setAll(items);
+            if (s.equals(AppState.get().getCurrentSwimmer())) {
+                AppState.get().setCurrentSwimmer(updated);
+            }
+            cb.getSelectionModel().select(updated);
+        }
+    }
+
+    private void confirmDeleteSwimmer(Swimmer s) {
+        Alert a = new Alert(Alert.AlertType.CONFIRMATION,
+                "Delete swimmer \"" + s.getFirstName() + " " + s.getLastName() + "\"?\n" +
+                        "This will also delete their saved workouts.",
+                ButtonType.CANCEL, ButtonType.OK);
+        a.setHeaderText("Delete swimmer");
+        a.showAndWait().ifPresent(bt -> {
+            if (bt == ButtonType.OK) {
+                LocalStore.deleteSwimmer(s.getId());
+                if (s.equals(AppState.get().getCurrentSwimmer())) {
+                    AppState.get().setCurrentSwimmer(null);
+                    AppState.get().setCurrentWorkout(null);
+                }
+                cb.getItems().remove(s);
+                if (cb.getItems().size() > 1) {
+                    cb.getSelectionModel().select(
+                            cb.getItems().get(0) == ADD_NEW ? cb.getItems().get(1) : cb.getItems().get(0)
+                    );
+                } else {
+                    cb.getSelectionModel().select(ADD_NEW);
+                }
+            }
+        });
+    }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./ui/seeds/SeedGridPane.java
+package swimworkoutbuilder_javafx.ui.seeds;
+
+import javafx.geometry.HPos;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.scene.text.Font;
+
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.enums.StrokeType;
+import swimworkoutbuilder_javafx.model.pacing.SeedPace;
+import swimworkoutbuilder_javafx.model.units.Distance;
+import swimworkoutbuilder_javafx.model.units.TimeSpan;
+import swimworkoutbuilder_javafx.state.AppState;
+import swimworkoutbuilder_javafx.store.LocalStore;
+
+import java.util.EnumMap;
+import java.util.Map;
+
+public class SeedGridPane extends VBox {
+
+    private final ToggleGroup unitGroup = new ToggleGroup();
+    private final RadioButton rbYards = new RadioButton("100 yards");
+    private final RadioButton rbMeters = new RadioButton("100 meters");
+
+    private final Map<StrokeType, TextField> timeFields = new EnumMap<>(StrokeType.class);
+
+    private final Label titleLabel = new Label("Seed Times");
+
+    private final Button btnEdit = new Button("Edit");
+    private final Button btnCancel = new Button("Cancel");
+    private final Button btnSave = new Button("Save & Exit");
+
+    private Swimmer swimmer;
+    private Runnable onSeedsSaved = () -> {};
+
+    public SeedGridPane() {
+        setAlignment(Pos.TOP_CENTER);
+        setSpacing(10);
+        setPadding(new Insets(10));
+
+        titleLabel.getStyleClass().add("label-header");
+
+        HBox radios = new HBox(20, rbYards, rbMeters);
+        radios.setAlignment(Pos.CENTER);
+        rbYards.setToggleGroup(unitGroup);
+        rbMeters.setToggleGroup(unitGroup);
+        rbYards.setSelected(true);
+
+        GridPane grid = buildGrid();
+
+        HBox buttons = new HBox(15, btnEdit, btnCancel, btnSave);
+        buttons.setAlignment(Pos.CENTER);
+
+        btnEdit.getStyleClass().add("button-secondary");
+        btnCancel.getStyleClass().add("button-secondary");
+        btnSave.getStyleClass().add("button-primary");
+
+        // initial mode = view (not editing)
+        setEditing(false);
+
+        btnEdit.setOnAction(e -> setEditing(true));
+        btnCancel.setOnAction(e -> {
+            if (swimmer != null) loadFromSwimmer(swimmer);
+            setEditing(false);
+        });
+
+        btnSave.setOnAction(e -> {
+            if (applyToModel()) {
+                // persist + nudge listeners
+                Swimmer cur = AppState.get().getCurrentSwimmer();
+                if (cur != null) {
+                    try { LocalStore.saveSwimmer(cur); } catch (Exception ignored) {}
+                    AppState.get().setCurrentSwimmer(cur);
+                }
+                setEditing(false);
+                if (swimmer != null) loadFromSwimmer(swimmer);
+                onSeedsSaved.run();
+            }
+        });
+
+        getChildren().addAll(titleLabel, radios, grid, buttons);
+
+        // keep in sync if current swimmer changes elsewhere
+        AppState.get().currentSwimmerProperty().addListener((obs, o, s) -> {
+            bindSwimmer(s);
+        });
+    }
+
+    public void bindSwimmer(Swimmer s) {
+        this.swimmer = s;
+        loadFromSwimmer(s);
+        setEditing(false);
+    }
+
+    public void setOnSeedsSaved(Runnable r) {
+        this.onSeedsSaved = (r == null ? () -> {} : r);
+    }
+
+    private GridPane buildGrid() {
+        GridPane grid = new GridPane();
+        grid.getStyleClass().add("grid-pane");
+        grid.setHgap(10);
+        grid.setVgap(5);
+        grid.setPadding(new Insets(10));
+
+        ColumnConstraints c0 = new ColumnConstraints();
+        c0.setHalignment(HPos.RIGHT);
+        c0.setMinWidth(80);
+        ColumnConstraints c1 = new ColumnConstraints();
+        c1.setPrefWidth(110);
+        c1.setHgrow(Priority.NEVER);
+        grid.getColumnConstraints().addAll(c0, c1);
+
+        Label hStroke = new Label("Stroke");
+        hStroke.getStyleClass().add("label-column-header");
+        Label hTime = new Label("Seed Time");
+        hTime.getStyleClass().add("label-column-header");
+        GridPane.setMargin(hStroke, new Insets(2,2,2,10));
+        GridPane.setMargin(hTime, new Insets(2,2,2,10));
+        grid.add(hStroke, 0, 0);
+        grid.add(hTime,   1, 0);
+
+        StrokeType[] rows = {
+                StrokeType.FREESTYLE,
+                StrokeType.BUTTERFLY,
+                StrokeType.BACKSTROKE,
+                StrokeType.BREASTSTROKE,
+                StrokeType.INDIVIDUAL_MEDLEY,
+                StrokeType.DRILL,
+                StrokeType.KICK
+        };
+
+        for (int i = 0; i < rows.length; i++) {
+            int row = i + 1;
+            StrokeType stroke = rows[i];
+
+            Label lbl = new Label(pretty(stroke));
+            lbl.setFont(Font.font(14));
+            TextField tf = new TextField();
+            tf.setPromptText("m:ss.hh");
+            tf.setTextFormatter(timeFormatter());
+
+            GridPane.setMargin(lbl, new Insets(2,2,2,10));
+            grid.add(lbl, 0, row);
+            grid.add(tf,  1, row);
+
+            timeFields.put(stroke, tf);
+        }
+        return grid;
+    }
+
+    private void setEditing(boolean editing) {
+        rbYards.setDisable(!editing);
+        rbMeters.setDisable(!editing);
+        timeFields.values().forEach(tf -> tf.setEditable(editing));
+
+        btnEdit.setDisable(editing);
+        btnCancel.setDisable(!editing);
+        btnSave.setDisable(!editing);
+    }
+
+    private void loadFromSwimmer(Swimmer s) {
+        if (s == null) {
+            timeFields.values().forEach(tf -> tf.setText(""));
+            return;
+        }
+        boolean useYards = true;
+        for (var e : s.getSeedPaces().entrySet()) {
+            double m = e.getValue().getOriginalDistance().toMeters();
+            if (m >= 99.5 && m <= 100.5) { useYards = false; break; }
+        }
+        rbYards.setSelected(useYards);
+        rbMeters.setSelected(!useYards);
+
+        // clear first
+        timeFields.values().forEach(tf -> tf.setText(""));
+        s.getSeedPaces().forEach((stroke, pace) -> {
+            timeFields.get(stroke).setText(fmtTime(pace.getTime()));
+        });
+    }
+
+    /** Read UI → write into bound swimmer. Returns true if success. */
+    private boolean applyToModel() {
+        if (swimmer == null) return false;
+        Map<StrokeType, SeedPace> paces = readPacesFromFields();
+        swimmer.clearAllSeeds();
+        paces.forEach(swimmer::updateSeedTime);
+        return true;
+    }
+
+    private Map<StrokeType, SeedPace> readPacesFromFields() {
+        Map<StrokeType, SeedPace> out = new EnumMap<>(StrokeType.class);
+        boolean yards = rbYards.isSelected();
+        Distance d = yards ? Distance.ofYards(100) : Distance.ofMeters(100);
+
+        for (var e : timeFields.entrySet()) {
+            String txt = e.getValue().getText().trim();
+            if (txt.isEmpty()) continue;
+            TimeSpan t = parseTime(txt);
+            out.put(e.getKey(), new SeedPace(d, t));
+        }
+        return out;
+    }
+
+    // --- helpers ---
+
+    private static String pretty(StrokeType st) {
+        return switch (st) {
+            case FREESTYLE -> "Freestyle";
+            case BUTTERFLY -> "Butterfly";
+            case BACKSTROKE -> "Backstroke";
+            case BREASTSTROKE -> "Breaststroke";
+            case INDIVIDUAL_MEDLEY -> "Individual Medley";
+            case DRILL -> "Drill";
+            case KICK -> "Kick";
+        };
+    }
+
+    private static TextFormatter<String> timeFormatter() {
+        return new TextFormatter<>(change -> {
+            String s = change.getControlNewText();
+            if (!s.matches("[0-9:.]*")) return null;
+            if (s.length() > 7) return null; // m:ss.hh
+            return change;
+        });
+    }
+
+    private static String fmtTime(TimeSpan t) {
+        long ms = t.toMillis();
+        long minutes = ms / 60000;
+        long seconds = (ms % 60000) / 1000;
+        long hundredths = ((ms % 1000) + 5) / 10;
+        if (hundredths == 100) { hundredths = 0; seconds++; }
+        if (seconds == 60) { seconds = 0; minutes++; }
+        return String.format("%d:%02d.%02d", minutes, seconds, hundredths);
+    }
+
+    private static TimeSpan parseTime(String s) {
+        s = s.trim();
+        int minutes = 0; int seconds; int hundredths = 0;
+        if (s.contains(":")) {
+            String[] parts = s.split(":");
+            minutes = Integer.parseInt(parts[0]);
+            s = parts[1];
+        }
+        if (s.contains(".")) {
+            String[] parts = s.split("\\.");
+            seconds = Integer.parseInt(parts[0]);
+            String h = parts[1];
+            if (h.length()==1) h = h + "0";
+            hundredths = Integer.parseInt(h.substring(0,2));
+        } else {
+            seconds = Integer.parseInt(s);
+        }
+        return TimeSpan.ofMinutesSecondsMillis(minutes, seconds, hundredths * 10);
+    }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./ui/UiUtil.java
+package swimworkoutbuilder_javafx.ui;
+
+import javafx.scene.control.TextFormatter;
+
+public final class UiUtil {
+    private UiUtil() {}
+    public static TextFormatter<String> maxLen(int max) {
+        return new TextFormatter<>(change -> {
+            String newText = change.getControlNewText();
+            return (newText.length() <= max) ? change : null;
+        });
+    }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./ui/dialogs/WorkoutFormDialog.java
+package swimworkoutbuilder_javafx.ui.dialogs;
+
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.model.enums.Course;
+import swimworkoutbuilder_javafx.ui.UiUtil;
+
+import java.util.UUID;
+
+public class WorkoutFormDialog {
+
+    /**
+     * @param swimmerId swimmer the workout belongs to
+     * @param initial   if non-null, dialog edits this workout in place
+     * @return the created/edited workout, or null if cancelled
+     */
+    public static Workout show(UUID swimmerId, Workout initial) {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle(initial == null ? "New Workout" : "Edit Workout");
+
+        // Labels/controls
+        Label lblName = new Label("Name:");
+        TextField tfName = new TextField();
+
+        Label lblCourse = new Label("Course:");
+        ChoiceBox<Course> cbCourse = new ChoiceBox<>();
+        cbCourse.getItems().addAll(Course.SCY, Course.SCM, Course.LCM);
+        cbCourse.setValue(Course.SCY);
+
+        Label lblNotes = new Label("Notes:");
+        TextArea taNotes = new TextArea();
+        taNotes.setTextFormatter(UiUtil.maxLen(100));
+        taNotes.setPrefRowCount(8);
+        taNotes.setWrapText(true);
+
+        Button btnSave = new Button("Save");
+        Button btnCancel = new Button("Cancel");
+        btnSave.setDefaultButton(true);
+        btnCancel.setCancelButton(true);
+        btnSave.setMinWidth(90);
+        btnCancel.setMinWidth(90);
+
+        // Pre-fill on edit
+        if (initial != null) {
+            tfName.setText(initial.getName());
+            taNotes.setText(initial.getNotes() == null ? "" : initial.getNotes());
+            cbCourse.setValue(initial.getCourse());
+        }
+
+        // Layout
+        GridPane gp = new GridPane();
+        gp.setHgap(10);
+        gp.setVgap(10);
+        gp.setPadding(new Insets(16));
+
+        // Column sizing: labels fixed width, fields grow
+        ColumnConstraints c0 = new ColumnConstraints();
+        c0.setMinWidth(90);
+        c0.setPrefWidth(110);
+        ColumnConstraints c1 = new ColumnConstraints();
+        c1.setHgrow(Priority.ALWAYS);
+        gp.getColumnConstraints().addAll(c0, c1);
+
+        // Rows
+        gp.add(lblName,   0, 0); gp.add(tfName,   1, 0);
+        gp.add(lblCourse, 0, 1); gp.add(cbCourse, 1, 1);
+        gp.add(lblNotes,  0, 2); gp.add(taNotes,  1, 2);
+
+        HBox buttons = new HBox(10, btnSave, btnCancel);
+        buttons.setAlignment(Pos.CENTER_RIGHT);
+        gp.add(buttons, 1, 3);
+
+        // Field growth
+        GridPane.setFillWidth(tfName, true);
+        tfName.setMaxWidth(Double.MAX_VALUE);
+        cbCourse.setMaxWidth(Double.MAX_VALUE);
+        taNotes.setMaxWidth(Double.MAX_VALUE);
+
+        final Workout[] result = new Workout[1];
+
+        btnSave.setOnAction(e -> {
+            String name = tfName.getText().trim();
+            if (name.isEmpty()) {
+                new Alert(Alert.AlertType.WARNING, "Workout name is required.").showAndWait();
+                return;
+            }
+            // Create or update in place
+            if (initial == null) {
+                Workout w = new Workout(swimmerId, name, cbCourse.getValue());
+                String notes = taNotes.getText();
+                if (notes != null && !notes.isBlank()) w.setNotes(notes);
+                result[0] = w;
+            } else {
+                initial.setName(name);
+                initial.setCourse(cbCourse.getValue());
+                String notes = taNotes.getText();
+                initial.setNotes((notes == null || notes.isBlank()) ? "" : notes);
+                result[0] = initial;
+            }
+            dialog.close();
+        });
+
+        btnCancel.setOnAction(e -> { result[0] = null; dialog.close(); });
+
+        dialog.setScene(new Scene(gp, 520, 360));
+        dialog.setResizable(false);
+        dialog.showAndWait();
+        return result[0];
+    }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./ui/dialogs/LoadWorkoutDialog.java
+package swimworkoutbuilder_javafx.ui.dialogs;
+
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.store.LocalStore;
+
+import java.util.UUID;
+
+public final class LoadWorkoutDialog {
+
+    private LoadWorkoutDialog() {}
+
+    /** Show a modal dialog listing workouts for the swimmer; return the chosen one or null if cancelled. */
+    public static Workout show(UUID swimmerId) {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("Load Workout");
+
+        ListView<Workout> list = new ListView<>();
+        list.getItems().setAll(LocalStore.listWorkoutsFor(swimmerId));
+
+        // Nice list text: "Workout Name — optional notes"
+        list.setCellFactory(v -> new ListCell<>() {
+            @Override protected void updateItem(Workout w, boolean empty) {
+                super.updateItem(w, empty);
+                if (empty || w == null) { setText(null); return; }
+                String notes = (w.getNotes()==null || w.getNotes().isBlank()) ? "" : " — " + w.getNotes();
+                setText(w.getName() + notes);
+            }
+        });
+
+        Button btnOpen = new Button("Open");
+        Button btnCancel = new Button("Cancel");
+        btnOpen.setDefaultButton(true);
+        btnCancel.setCancelButton(true);
+        btnOpen.setDisable(true);
+
+        list.getSelectionModel().selectedItemProperty().addListener((obs,o,sel) -> btnOpen.setDisable(sel==null));
+
+        final Workout[] result = new Workout[1];
+        btnOpen.setOnAction(e -> { result[0] = list.getSelectionModel().getSelectedItem(); dialog.close(); });
+        btnCancel.setOnAction(e -> { result[0] = null; dialog.close(); });
+
+        BorderPane root = new BorderPane(list);
+        HBox buttons = new HBox(10, btnCancel, btnOpen);
+        buttons.setPadding(new Insets(8));
+        buttons.setStyle("-fx-alignment: center-right;");
+        root.setBottom(buttons);
+        root.setPadding(new Insets(8));
+
+        dialog.setScene(new Scene(root, 520, 380));
+        dialog.showAndWait();
+        return result[0];
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./ui/dialogs/SetGroupFormDialog.java
+package swimworkoutbuilder_javafx.ui.dialogs;
+
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.*;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.stage.Modality;
+import javafx.stage.StageStyle;
+import swimworkoutbuilder_javafx.model.SetGroup;
+
+public class SetGroupFormDialog {
+
+    public static SetGroup show(SetGroup existing) {
+        Dialog<SetGroup> d = new Dialog<>();
+        d.initStyle(StageStyle.UTILITY);
+        d.initModality(Modality.APPLICATION_MODAL);
+        d.setTitle(existing == null ? "New Group" : "Edit Group");
+
+        ButtonType BT_SAVE = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        d.getDialogPane().getButtonTypes().addAll(BT_SAVE, ButtonType.CANCEL);
+
+        TextField tfName = new TextField();
+        tfName.setPromptText("e.g. Main Set");
+
+        Spinner<Integer> spReps = new Spinner<>(1, 999, 1);
+        spReps.setEditable(true);
+
+        // NEW: rest between sets (seconds)
+        Spinner<Integer> spRestBetweenSets = new Spinner<>(0, 3600, 0);
+        spRestBetweenSets.setEditable(true);
+
+        // EXISTING: rest between group repeats (seconds)
+        Spinner<Integer> spRestAfterGroup = new Spinner<>(0, 3600, 0);
+        spRestAfterGroup.setEditable(true);
+
+        TextField tfNotes = new TextField();
+        tfNotes.setPromptText("Notes (≤100 chars)");
+        tfNotes.textProperty().addListener((obs, o, n) -> {
+            if (n != null && n.length() > 100) tfNotes.setText(n.substring(0, 100));
+        });
+
+        // Populate if editing
+        if (existing != null) {
+            tfName.setText(existing.getName());
+            spReps.getValueFactory().setValue(existing.getReps());
+            spRestBetweenSets.getValueFactory().setValue(existing.getRestBetweenSetsSec());
+            spRestAfterGroup.getValueFactory().setValue(existing.getRestAfterGroupSec());
+            tfNotes.setText(existing.getNotes() == null ? "" : existing.getNotes());
+        }
+
+        GridPane gp = new GridPane();
+        gp.setHgap(8);
+        gp.setVgap(8);
+        gp.setPadding(new Insets(10));
+
+        int r = 0;
+        gp.add(new Label("Group name:"), 0, r); gp.add(tfName, 1, r++);
+        gp.add(new Label("Repetitions:"), 0, r); gp.add(spReps, 1, r++);
+        gp.add(new Label("Rest between sets (sec):"), 0, r); gp.add(spRestBetweenSets, 1, r++);
+        gp.add(new Label("Rest between group repeats (sec):"), 0, r); gp.add(spRestAfterGroup, 1, r++);
+        gp.add(new Label("Notes:"), 0, r); gp.add(tfNotes, 1, r++);
+
+        d.getDialogPane().setContent(gp);
+
+        d.setResultConverter(bt -> {
+            if (bt == BT_SAVE) {
+                SetGroup g = existing == null ? new SetGroup() : existing;
+                g.setName(tfName.getText() == null ? "" : tfName.getText().trim());
+                g.setReps(safe(spReps.getValue()));
+                g.setRestBetweenSetsSec(safe(spRestBetweenSets.getValue()));
+                g.setRestAfterGroupSec(safe(spRestAfterGroup.getValue()));
+                g.setNotes(tfNotes.getText());
+                return g;
+            }
+            return null;
+        });
+
+        return d.showAndWait().orElse(null);
+    }
+
+    private static int safe(Integer v) { return v == null ? 0 : Math.max(0, v); }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./ui/dialogs/SwimmerFormDialog.java
+package swimworkoutbuilder_javafx.ui.dialogs;
+
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import swimworkoutbuilder_javafx.model.Swimmer;
+
+public final class SwimmerFormDialog {
+
+    private SwimmerFormDialog() {}
+
+    // Create new swimmer
+    public static Swimmer show() {
+        return showInternal(null);
+    }
+
+    // Edit existing swimmer (prefilled; preserves UUID & seeds)
+    public static Swimmer show(Swimmer existing) {
+        return showInternal(existing);
+    }
+
+    private static Swimmer showInternal(Swimmer existing) {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle(existing == null ? "Add Swimmer" : "Edit Swimmer");
+
+        TextField tfFirst = new TextField(existing == null ? "" : existing.getFirstName());
+        TextField tfLast  = new TextField(existing == null ? "" : existing.getLastName());
+        TextField tfPref  = new TextField(existing == null ? "" :
+                (existing.getPreferredName() == null ? "" : existing.getPreferredName()));
+        TextField tfTeam  = new TextField(existing == null ? "" :
+                (existing.getTeamName() == null ? "" : existing.getTeamName()));
+
+        GridPane grid = new GridPane();
+        grid.setHgap(8); grid.setVgap(8); grid.setPadding(new Insets(12));
+        int r = 0;
+        grid.add(new Label("First name:"), 0, r); grid.add(tfFirst, 1, r++);
+        grid.add(new Label("Last name:"),  0, r); grid.add(tfLast,  1, r++);
+        grid.add(new Label("Preferred:"),  0, r); grid.add(tfPref,  1, r++);
+        grid.add(new Label("Team:"),       0, r); grid.add(tfTeam,  1, r++);
+
+        Button btnCancel = new Button("Cancel");
+        Button btnSave   = new Button("Save");
+        btnSave.setDefaultButton(true);
+        btnCancel.setCancelButton(true);
+
+        HBox buttons = new HBox(10, btnCancel, btnSave);
+        buttons.setStyle("-fx-alignment: center-right;");
+        buttons.setPadding(new Insets(8));
+
+        BorderPane root = new BorderPane(grid);
+        root.setBottom(buttons);
+
+        final Swimmer[] result = new Swimmer[1];
+        btnSave.setOnAction(e -> {
+            String first = tfFirst.getText().trim();
+            String last  = tfLast.getText().trim();
+            if (first.isEmpty() || last.isEmpty()) {
+                new Alert(Alert.AlertType.INFORMATION, "First and last name are required.").showAndWait();
+                return;
+            }
+            if (existing == null) {
+                result[0] = new Swimmer(first, last,
+                        tfPref.getText().trim().isEmpty() ? null : tfPref.getText().trim(),
+                        tfTeam.getText().trim().isEmpty() ? null : tfTeam.getText().trim());
+            } else {
+                existing.setFirstName(first);
+                existing.setLastName(last);
+                existing.setPreferredName(tfPref.getText().trim().isEmpty() ? null : tfPref.getText().trim());
+                existing.setTeamName(tfTeam.getText().trim().isEmpty() ? null : tfTeam.getText().trim());
+                result[0] = existing;
+            }
+            dialog.close();
+        });
+        btnCancel.setOnAction(e -> { result[0] = null; dialog.close(); });
+
+        dialog.setScene(new Scene(root, 460, 250));
+        dialog.showAndWait();
+        return result[0];
+    }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./ui/dialogs/SeedFormDialog.java
+package swimworkoutbuilder_javafx.ui.dialogs;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.enums.StrokeType;
+import swimworkoutbuilder_javafx.model.pacing.SeedPace;
+import swimworkoutbuilder_javafx.model.units.Distance;
+import swimworkoutbuilder_javafx.model.units.TimeSpan;
+
+import java.util.EnumMap;
+import java.util.Map;
+
+public class SeedFormDialog {
+
+    public static void show(Swimmer swimmer) {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("Seed Times");
+
+        Label lblSwimmerName = new Label(swimmer != null
+                ? "Swimmer: " + swimmer.getFirstName() + " " + swimmer.getLastName()
+                : "Swimmer: —");
+
+        ChoiceBox<StrokeType> cbStroke = new ChoiceBox<>();
+        cbStroke.getItems().setAll(StrokeType.values());
+        cbStroke.getSelectionModel().selectFirst();
+
+        TextField tfDistance = new TextField("100");
+        RadioButton rbYards = new RadioButton("Yards");
+        RadioButton rbMeters = new RadioButton("Meters");
+        ToggleGroup unitGroup = new ToggleGroup(); rbYards.setToggleGroup(unitGroup); rbMeters.setToggleGroup(unitGroup); rbYards.setSelected(true);
+
+        TextField tfTime = new TextField("2:30");
+        Button btnAdd = new Button("Add/Update");
+        Button btnDelete = new Button("Delete");
+        Button btnSave = new Button("Save");
+        Button btnCancel = new Button("Cancel");
+        btnSave.setDefaultButton(true);
+        btnCancel.setCancelButton(true);
+        btnDelete.setDisable(true);
+
+        TableView<Row> table = new TableView<>();
+        TableColumn<Row, String> colStroke = new TableColumn<>("Stroke");
+        TableColumn<Row, String> colDistance = new TableColumn<>("Distance");
+        TableColumn<Row, String> colPace = new TableColumn<>("Pace");
+        colStroke.setPrefWidth(110);
+        colDistance.setPrefWidth(90);
+        colPace.setPrefWidth(100);
+        table.getColumns().addAll(colStroke, colDistance, colPace);
+
+        final Map<StrokeType, SeedPace> working = new EnumMap<>(StrokeType.class);
+        if (swimmer != null && swimmer.getSeedPaces() != null) {
+            working.putAll(swimmer.getSeedPaces());
+        }
+        final ObservableList<Row> rows = FXCollections.observableArrayList();
+
+        colStroke.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(data.getValue().stroke.name()));
+        colDistance.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(fmtDistanceShort(data.getValue().pace.getOriginalDistance())));
+        colPace.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(fmtTime(data.getValue().pace.getTime())));
+        table.setItems(rows);
+        refreshRows(working, rows);
+
+        table.getSelectionModel().selectedItemProperty().addListener((obs, oldR, r) -> {
+            boolean has = r != null;
+            btnDelete.setDisable(!has);
+            if (has) {
+                cbStroke.setValue(r.stroke);
+                Distance d = r.pace.getOriginalDistance();
+                int yards = (int)Math.round(d.toYards());
+                int meters = (int)Math.round(d.toMeters());
+                if (yards % 25 == 0) { tfDistance.setText(Integer.toString(yards)); rbYards.setSelected(true); }
+                else { tfDistance.setText(Integer.toString(meters)); rbMeters.setSelected(true); }
+                tfTime.setText(fmtTime(r.pace.getTime()));
+            }
+        });
+
+        btnAdd.setOnAction(e -> {
+            StrokeType stroke = cbStroke.getValue();
+            String distTxt = tfDistance.getText().trim();
+            String timeTxt = tfTime.getText().trim();
+            if (distTxt.isEmpty() || timeTxt.isEmpty()) { new Alert(Alert.AlertType.WARNING, "Distance and time are required.").showAndWait(); return; }
+            int amount;
+            try { amount = Integer.parseInt(distTxt); } catch (NumberFormatException ex) { new Alert(Alert.AlertType.WARNING, "Distance must be an integer.").showAndWait(); return; }
+            Distance d = rbYards.isSelected() ? Distance.ofYards(amount) : Distance.ofMeters(amount);
+            TimeSpan t = parseTime(timeTxt);
+            working.put(stroke, new SeedPace(d, t));
+            refreshRows(working, rows);
+        });
+
+        btnDelete.setOnAction(e -> {
+            Row sel = table.getSelectionModel().getSelectedItem();
+            if (sel == null) return;
+            working.remove(sel.stroke);
+            refreshRows(working, rows);
+        });
+
+        btnSave.setOnAction(e -> {
+            if (swimmer == null) { dialog.close(); return; }
+            swimmer.setAllSeedPaces(working);
+            dialog.close();
+        });
+
+        btnCancel.setOnAction(e -> dialog.close());
+
+        GridPane form = new GridPane();
+        form.setHgap(8); form.setVgap(8); form.setPadding(new Insets(8));
+        form.addRow(0, new Label("Stroke:"), cbStroke);
+        form.addRow(1, new Label("Distance:"), tfDistance);
+        form.addRow(2, new Label("Units:"), new HBox(8, rbYards, rbMeters));
+        form.addRow(3, new Label("Time (m:ss.HH):"), tfTime);
+        form.addRow(4, btnAdd, btnDelete);
+
+        BorderPane root = new BorderPane();
+        root.setTop(lblSwimmerName);
+        BorderPane.setMargin(lblSwimmerName, new Insets(8));
+        root.setCenter(table);
+        root.setBottom(new HBox(8, form, new HBox(12, btnCancel, btnSave)));
+        BorderPane.setMargin(root.getBottom(), new Insets(8));
+
+        dialog.setScene(new Scene(root, 560, 440));
+        dialog.setResizable(false);
+        dialog.showAndWait();
+    }
+
+    // ----- helpers -----
+
+    public static final class Row { final StrokeType stroke; final SeedPace pace; Row(StrokeType s, SeedPace p) { this.stroke = s; this.pace = p; } }
+
+    private static void refreshRows(Map<StrokeType, SeedPace> working, ObservableList<Row> rows) {
+        rows.setAll(working.entrySet().stream().map(e -> new Row(e.getKey(), e.getValue())).toList());
+    }
+
+    private static String fmtDistanceShort(Distance d) {
+        int y = (int)Math.round(d.toYards());
+        int m = (int)Math.round(d.toMeters());
+        if (y % 25 == 0) return y + " yd";
+        return m + " m";
+    }
+
+    private static String fmtTime(TimeSpan t) {
+        long ms = t.toMillis();
+        long minutes = ms / 60000;
+        long seconds = (ms % 60000) / 1000;
+        long hundredths = ((ms % 1000) + 5) / 10;
+        if (hundredths == 100) { hundredths = 0; seconds++; }
+        if (seconds == 60) { seconds = 0; minutes++; }
+        return String.format("%d:%02d.%02d", minutes, seconds, hundredths);
+    }
+
+    private static TimeSpan parseTime(String s) {
+        s = s.trim();
+        int minutes = 0; int seconds; int hundredths = 0;
+        if (s.contains(":")) { String[] parts = s.split(":"); minutes = Integer.parseInt(parts[0]); s = parts[1]; }
+        if (s.contains(".")) { String[] parts = s.split("\\."); seconds = Integer.parseInt(parts[0]); String h = parts[1]; if (h.length()==1) h = h + "0"; hundredths = Integer.parseInt(h.substring(0,2)); }
+        else { seconds = Integer.parseInt(s); }
+        return TimeSpan.ofMinutesSecondsMillis(minutes, seconds, hundredths * 10);
+    }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./ui/dialogs/SetFormDialog.java
+package swimworkoutbuilder_javafx.ui.dialogs;
+
+import javafx.geometry.Insets;
+import javafx.scene.control.*;
+import javafx.scene.layout.GridPane;
+import javafx.stage.Modality;
+import javafx.stage.StageStyle;
+import swimworkoutbuilder_javafx.model.SwimSet;
+import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.model.enums.Course;
+import swimworkoutbuilder_javafx.model.enums.Effort;
+import swimworkoutbuilder_javafx.model.enums.Equipment;
+import swimworkoutbuilder_javafx.model.enums.StrokeType;
+import swimworkoutbuilder_javafx.model.units.Distance;
+import swimworkoutbuilder_javafx.model.units.TimeSpan;
+
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
+
+public class SetFormDialog {
+
+    /**
+     * Show the Set editor/creator.
+     * @param workout used only to interpret distance units (SCY uses yards; SCM/LCM use meters)
+     * @param existing null to create, non-null to edit
+     */
+    public static SwimSet show(Workout workout, SwimSet existing) {
+        Dialog<SwimSet> d = new Dialog<>();
+        d.initStyle(StageStyle.UTILITY);
+        d.initModality(Modality.APPLICATION_MODAL);
+        d.setTitle(existing == null ? "Add Set" : "Edit Set");
+
+        ButtonType BT_SAVE = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        d.getDialogPane().getButtonTypes().addAll(BT_SAVE, ButtonType.CANCEL);
+
+        // --- Controls ---
+        ComboBox<StrokeType> cbStroke = new ComboBox<>();
+        cbStroke.getItems().addAll(StrokeType.values());
+        cbStroke.setPrefWidth(200);
+
+        ComboBox<Effort> cbEffort = new ComboBox<>();
+        cbEffort.getItems().addAll(Effort.values());
+        cbEffort.setPrefWidth(200);
+
+        Spinner<Integer> spReps = new Spinner<>(1, 999, 1);
+        spReps.setEditable(true);
+
+        TextField tfDistance = new TextField();
+        tfDistance.setPromptText("Distance per rep (e.g. 50, 100)");
+        tfDistance.setTextFormatter(integerFormatter());
+
+        // interval / goal time
+        TextField tfInterval = new TextField();
+        tfInterval.setPromptText("Interval @ (m:ss.hh)");
+        tfInterval.setTextFormatter(timeFormatter());
+
+        TextField tfGoal = new TextField();
+        tfGoal.setPromptText("Goal time (m:ss.hh)");
+        tfGoal.setTextFormatter(timeFormatter());
+
+        // equipment (multi-select via checkboxes)
+        List<CheckBox> eqChecks = new ArrayList<>();
+        for (Equipment eq : Equipment.values()) {
+            CheckBox cb = new CheckBox(eq.getLabel());
+            cb.setUserData(eq);
+            eqChecks.add(cb);
+        }
+
+        TextField tfNotes = new TextField();
+        tfNotes.setPromptText("Notes (≤100 chars)");
+        tfNotes.textProperty().addListener((obs, o, n) -> {
+            if (n != null && n.length() > 100) tfNotes.setText(n.substring(0, 100));
+        });
+
+        // --- Prefill if editing ---
+        if (existing != null) {
+            if (existing.getStroke() != null) cbStroke.setValue(existing.getStroke());
+            if (existing.getEffort() != null) cbEffort.setValue(existing.getEffort());
+            spReps.getValueFactory().setValue(Math.max(1, existing.getReps()));
+
+            if (existing.getDistancePerRep() != null) {
+                int val = inferDisplayDistance(existing.getDistancePerRep(),
+                        workout != null ? workout.getCourse() : Course.SCY);
+                tfDistance.setText(Integer.toString(val));
+            }
+
+            tfInterval.setText(fmtTime(existing.getInterval()));
+            tfGoal.setText(fmtTime(existing.getGoalTime()));
+
+            if (existing.getEquipment() != null) {
+                Set<Equipment> eqSel = existing.getEquipment();
+                for (CheckBox cb : eqChecks) {
+                    Equipment eq = (Equipment) cb.getUserData();
+                    cb.setSelected(eqSel.contains(eq));
+                }
+            }
+
+            tfNotes.setText(existing.getNotes() == null ? "" : existing.getNotes());
+        } else {
+            cbEffort.setValue(Effort.EASY);
+        }
+
+        // --- Layout ---
+        GridPane gp = new GridPane();
+        gp.setHgap(8);
+        gp.setVgap(8);
+        gp.setPadding(new Insets(12));
+
+        int r = 0;
+        gp.add(new Label("Stroke:"), 0, r); gp.add(cbStroke, 1, r++);
+        gp.add(new Label("Effort:"), 0, r); gp.add(cbEffort, 1, r++);
+        gp.add(new Label("Reps:"), 0, r); gp.add(spReps, 1, r++);
+        gp.add(new Label("Distance per rep:"), 0, r); gp.add(tfDistance, 1, r++);
+
+        gp.add(new Label("Interval (@):"), 0, r); gp.add(tfInterval, 1, r++);
+        gp.add(new Label("Goal time:"),    0, r); gp.add(tfGoal,     1, r++);
+
+        gp.add(new Label("Equipment:"), 0, r);
+        GridPane eqGrid = new GridPane();
+        eqGrid.setHgap(10); eqGrid.setVgap(4);
+        int er = 0, ec = 0;
+        for (CheckBox cb : eqChecks) {
+            eqGrid.add(cb, ec, er);
+            ec++;
+            if (ec == 3) { ec = 0; er++; }
+        }
+        gp.add(eqGrid, 1, r++);
+
+        gp.add(new Label("Notes:"), 0, r); gp.add(tfNotes, 1, r++);
+
+        d.getDialogPane().setContent(gp);
+
+        // --- Result ---
+        d.setResultConverter(bt -> {
+            if (bt != BT_SAVE) return null;
+
+            SwimSet out = existing == null ? new SwimSet() : existing;
+
+            out.setStroke(cbStroke.getValue());
+            out.setEffort(cbEffort.getValue());
+            out.setReps(safeInt(spReps.getValue(), 1));
+
+            // distance per rep based on course
+            int dist = safeIntFromField(tfDistance, 25);
+            Course c = (workout != null ? workout.getCourse() : Course.SCY);
+            Distance dpr = (c == Course.SCY) ? Distance.ofYards(dist) : Distance.ofMeters(dist);
+            out.setDistancePerRep(dpr);
+
+            // times
+            out.setInterval(parseTime(tfInterval.getText()));
+            out.setGoalTime(parseTime(tfGoal.getText()));
+
+            // equipment
+            EnumSet<Equipment> sel = EnumSet.noneOf(Equipment.class);
+            for (CheckBox cb : eqChecks) if (cb.isSelected()) sel.add((Equipment) cb.getUserData());
+            out.setEquipment(sel);
+
+            out.setNotes(tfNotes.getText());
+            return out;
+        });
+
+        return d.showAndWait().orElse(null);
+    }
+
+    // ---------- helpers ----------
+
+    private static TextFormatter<String> integerFormatter() {
+        return new TextFormatter<>(change -> {
+            String s = change.getControlNewText();
+            if (s.isEmpty()) return change;
+            if (!s.matches("\\d+")) return null;
+            if (s.length() > 5) return null;
+            return change;
+        });
+    }
+
+    private static TextFormatter<String> timeFormatter() {
+        return new TextFormatter<>(change -> {
+            String s = change.getControlNewText();
+            if (!s.matches("[0-9:.]*")) return null;
+            if (s.length() > 7) return null; // m:ss.hh
+            return change;
+        });
+    }
+
+    private static TimeSpan parseTime(String s) {
+        if (s == null) return null;
+        s = s.trim();
+        if (s.isEmpty()) return null;
+        int minutes = 0; int seconds; int hundredths = 0;
+        if (s.contains(":")) { String[] parts = s.split(":"); minutes = Integer.parseInt(parts[0]); s = parts[1]; }
+        if (s.contains(".")) { String[] parts = s.split("\\."); seconds = Integer.parseInt(parts[0]); String h = parts[1]; if (h.length()==1) h = h + "0"; hundredths = Integer.parseInt(h.substring(0,2)); }
+        else { seconds = Integer.parseInt(s); }
+        return TimeSpan.ofMinutesSecondsMillis(minutes, seconds, hundredths * 10);
+    }
+
+    private static String fmtTime(TimeSpan t) {
+        if (t == null) return "";
+        long ms = t.toMillis();
+        long minutes = ms / 60000;
+        long seconds = (ms % 60000) / 1000;
+        long hundredths = ((ms % 1000) + 5) / 10;
+        if (hundredths == 100) { hundredths = 0; seconds++; }
+        if (seconds == 60) { seconds = 0; minutes++; }
+        return String.format("%d:%02d%s", minutes, seconds,
+                hundredths > 0 ? "." + String.format("%02d", hundredths) : "");
+    }
+
+    private static int safeInt(Integer v, int min) {
+        if (v == null) return min;
+        return Math.max(min, v);
+    }
+
+    private static int safeIntFromField(TextField tf, int def) {
+        String s = tf.getText();
+        if (s == null || s.isBlank()) return def;
+        try { return Integer.parseInt(s.trim()); }
+        catch (Exception e) { return def; }
+    }
+
+    private static int inferDisplayDistance(Distance d, Course c) {
+        return (c == Course.SCY)
+                ? (int)Math.round(d.toYards())
+                : (int)Math.round(d.toMeters());
+    }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./ui/MainView.java
+package swimworkoutbuilder_javafx.ui;
+
+import javafx.geometry.Insets;
+import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.layout.*;
+import javafx.util.Callback;
+
+import swimworkoutbuilder_javafx.model.SetGroup;
+import swimworkoutbuilder_javafx.model.SwimSet;
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.model.enums.Course;
+import swimworkoutbuilder_javafx.model.units.Distance;
+import swimworkoutbuilder_javafx.model.units.TimeSpan;
+import swimworkoutbuilder_javafx.state.AppState;
+import swimworkoutbuilder_javafx.store.LocalStore;
+import swimworkoutbuilder_javafx.ui.components.SwimmerChooserPane;
+import swimworkoutbuilder_javafx.ui.dialogs.SetFormDialog;
+import swimworkoutbuilder_javafx.ui.dialogs.SetGroupFormDialog;
+import swimworkoutbuilder_javafx.ui.dialogs.SwimmerFormDialog;
+import swimworkoutbuilder_javafx.ui.dialogs.WorkoutFormDialog;
+import swimworkoutbuilder_javafx.ui.seeds.SeedGridPane;
+import swimworkoutbuilder_javafx.ui.shell.ActionBar;
+
+import java.util.List;
+import java.util.Objects;
+
+public class MainView extends BorderPane {
+
+    // Left: header + tree + toolbar
+    private final VBox leftPane = new VBox(8);
+    private final Label hdrSummaryDistance = new Label("-");
+    private final Label hdrSummaryDuration = new Label("Duration:");
+    private final Label hdrSummarySwim = new Label("- swimming");
+    private final Label hdrSummaryRest = new Label("- rest");
+    private final Label hdrSummaryTotal = new Label("- total");
+    private final Label hdrPool = new Label("Pool Length: -");
+
+    private final TreeView<Object> workoutTree = new TreeView<>();
+    private final Button btAddGroup = new Button("Add Group...");
+    private final Button btAddSet = new Button("Add Set...");
+
+    private final TitledPane leftHeader = new TitledPane();
+    private final Label hdrWorkoutName = new Label("Workout: -");
+    private final Label hdrWorkoutNotes = new Label("");
+
+    // Course radios in the header
+    private final ToggleGroup courseGroup = new ToggleGroup();
+    private final RadioButton rbScy = new RadioButton("SCY");
+    private final RadioButton rbScm = new RadioButton("SCM");
+    private final RadioButton rbLcm = new RadioButton("LCM");
+
+    // Right panel: seed editor
+    private SeedGridPane seedPane;
+
+    // Center placeholder (unused at the moment)
+    private final StackPane centerPane = new StackPane(new Label(""));
+
+    // Model state
+    private Workout workout;
+    private Swimmer currentSwimmer;
+
+    public MainView() {
+        buildLeftPane();
+        buildRightPane();
+
+        // Top action bar
+        ActionBar ab = new ActionBar();
+        setTop(ab.node());
+
+        // React to global state changes
+        AppState.get().currentSwimmerProperty().addListener((obs, o, s) -> setCurrentSwimmer(s));
+        AppState.get().currentWorkoutProperty().addListener((obs, o, w) -> setWorkout(w));
+
+        setLeft(leftPane);
+        setCenter(centerPane);
+        setRight(seedPane);
+
+        setPadding(new Insets(8));
+        refreshHeader();
+        rebuildTree();
+
+        // --- Autosave: persist last used swimmer/workout + the entities themselves ---
+        AppState.get().currentSwimmerProperty().addListener((obs, o, s) -> {
+            if (s != null) {
+                try { LocalStore.saveSwimmer(s); } catch (Exception ignored) {}
+                LocalStore.saveLast(
+                        s.getId(),
+                        AppState.get().getCurrentWorkout() == null ? null : AppState.get().getCurrentWorkout().getId()
+                );
+            }
+        });
+        AppState.get().currentWorkoutProperty().addListener((obs, o, w) -> {
+            if (w != null) {
+                try { LocalStore.saveWorkout(w); } catch (Exception ignored) {}
+                LocalStore.saveLast(
+                        AppState.get().getCurrentSwimmer() == null ? null : AppState.get().getCurrentSwimmer().getId(),
+                        w.getId()
+                );
+            }
+        });
+
+        // --- Resume last session ---
+        try {
+            var lastS = LocalStore.lastSwimmer();
+            if (lastS.isPresent()) {
+                var s = LocalStore.loadSwimmer(lastS.get());
+                AppState.get().setCurrentSwimmer(s);   // also push into global state
+                setCurrentSwimmer(s);
+            }
+            var lastW = LocalStore.lastWorkout();
+            if (lastW.isPresent()) {
+                var w = LocalStore.loadWorkout(lastW.get());
+                AppState.get().setCurrentWorkout(w);   // also push into global state
+                setWorkout(w);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void buildLeftPane() {
+        // swimmer chooser above the summary card
+        leftPane.getChildren().add(0, new SwimmerChooserPane());
+
+        // header content
+        VBox content = new VBox(6,
+                hdrWorkoutName,
+                hdrWorkoutNotes,
+                new Label("Workout summary:"),
+                hdrSummaryDistance,
+                hdrSummaryDuration,
+                hdrSummarySwim,
+                hdrSummaryRest,
+                hdrSummaryTotal,
+                hdrPool
+        );
+
+        // course radios row
+        rbScy.setToggleGroup(courseGroup);
+        rbScm.setToggleGroup(courseGroup);
+        rbLcm.setToggleGroup(courseGroup);
+        rbScy.setSelected(true);
+        HBox courseRow = new HBox(10, new Label("Course:"), rbScy, rbScm, rbLcm);
+        courseRow.setPadding(new Insets(0, 0, 4, 0));
+        content.getChildren().add(1, courseRow);
+
+        // change handler -> update workout course
+        courseGroup.selectedToggleProperty().addListener((obs, oldT, newT) -> {
+            if (workout == null || newT == null) return;
+            if (newT == rbScy)      workout.setCourse(Course.SCY);
+            else if (newT == rbScm) workout.setCourse(Course.SCM);
+            else if (newT == rbLcm) workout.setCourse(Course.LCM);
+            refreshHeader();
+            rebuildTree();
+        });
+
+        content.setPadding(new Insets(6));
+        leftHeader.setText("Swimmer: -"); // title updated in refreshHeader()
+        leftHeader.setContent(content);
+        leftHeader.setExpanded(true);
+
+        // tree
+        workoutTree.setShowRoot(false);
+        workoutTree.setCellFactory(makeCellFactory());
+        workoutTree.setOnKeyPressed(ke -> {
+            if (ke.getCode() == KeyCode.DELETE || ke.getCode() == KeyCode.BACK_SPACE) {
+                var sel = workoutTree.getSelectionModel().getSelectedItem();
+                if (sel == null) return;
+                Object v = sel.getValue();
+                if (v instanceof SwimSet s) deleteSet(s);
+                else if (v instanceof SetGroup g) deleteGroup(g);
+            }
+        });
+
+        HBox toolbar = new HBox(8, btAddGroup, btAddSet);
+        btAddGroup.setOnAction(e -> handleAddGroup());
+        btAddSet.setOnAction(e -> handleAddSet());
+
+        VBox.setVgrow(workoutTree, Priority.ALWAYS);
+        leftPane.getChildren().addAll(leftHeader, new Label("Workout"), workoutTree, toolbar);
+        leftPane.setPadding(new Insets(8));
+    }
+
+    private void buildRightPane() {
+        seedPane = new SeedGridPane();
+        seedPane.setOnSeedsSaved(() -> {
+            // when seeds change, recompute header timings
+            refreshHeader();
+            rebuildTree();
+        });
+        seedPane.setPadding(new Insets(8));
+        seedPane.setPrefWidth(320);
+        setRight(seedPane);
+    }
+
+    // ======= Tree building & formatting =======
+
+    private void rebuildTree() {
+        TreeItem<Object> root = new TreeItem<>("ROOT");
+        if (workout != null) {
+            for (SetGroup g : workout.getGroups()) {
+                TreeItem<Object> gItem = new TreeItem<>(g);
+                for (SwimSet s : g.getSets()) {
+                    gItem.getChildren().add(new TreeItem<>(s));
+                }
+                gItem.setExpanded(true);
+                root.getChildren().add(gItem);
+            }
+        }
+        workoutTree.setRoot(root);
+    }
+
+    private Callback<TreeView<Object>, TreeCell<Object>> makeCellFactory() {
+        return tv -> new TreeCell<>() {
+            private final VBox card   = new VBox(2);
+            private final HBox header = new HBox(6);
+            private final Label title  = new Label();
+            private final Label sub    = new Label();
+            private final Region spacer = new Region();
+            private final Button btnEdit     = new Button("Edit");
+            private final Button btnAddSet   = new Button("Add Set");
+            private final Button btnAddGroup = new Button("Add Group");
+            private final ContextMenu cmenu = new ContextMenu();
+            private final MenuItem miEdit          = new MenuItem("Edit...");
+            private final MenuItem miAddSet        = new MenuItem("Add Set...");
+            private final MenuItem miAddGroupAfter = new MenuItem("Add Group After...");
+            private final MenuItem miDelete        = new MenuItem("Delete");
+
+            {
+                HBox.setHgrow(spacer, Priority.ALWAYS);
+                header.getChildren().addAll(title, spacer, btnEdit);
+                card.getChildren().setAll(header);
+
+                btnEdit.setOnAction(e -> onEditClicked());
+                btnAddSet.setOnAction(e -> onAddSetClicked());
+                btnAddGroup.setOnAction(e -> onAddGroupClicked());
+
+                miEdit.setOnAction(e -> onEditClicked());
+                miAddSet.setOnAction(e -> onAddSetClicked());
+                miAddGroupAfter.setOnAction(e -> onAddGroupClicked());
+                miDelete.setOnAction(e -> onDeleteClicked());
+            }
+
+            private void onEditClicked() {
+                Object v = getItem();
+                if (v instanceof SetGroup g) {
+                    SetGroup edited = SetGroupFormDialog.show(g);
+                    if (edited != null) {
+                        g.setName(edited.getName());
+                        g.setReps(edited.getReps());
+                        g.setNotes(edited.getNotes());
+                        g.setRestAfterGroupSec(edited.getRestAfterGroupSec());
+                        try { // if dialog exposes rest-between-sets, keep it; otherwise ignore
+                            var m = SetGroup.class.getMethod("setRestBetweenSetsSec", int.class);
+                            var gm = SetGroup.class.getMethod("getRestBetweenSetsSec");
+                            m.invoke(g, (int)gm.invoke(edited));
+                        } catch (Exception ignored) {}
+                        rebuildTree();
+                        refreshHeader();
+                    }
+                } else if (v instanceof SwimSet s) {
+                    SwimSet edited = SetFormDialog.show(workout, s);
+                    if (edited != null) {
+                        s.setStroke(edited.getStroke());
+                        s.setEffort(edited.getEffort());
+                        s.setReps(edited.getReps());
+                        s.setDistancePerRep(edited.getDistancePerRep());
+                        s.setNotes(edited.getNotes());
+                        s.setEquipment(edited.getEquipment());
+                        s.setInterval(edited.getInterval());
+                        s.setGoalTime(edited.getGoalTime());
+                        rebuildTree();
+                        refreshHeader();
+                    }
+                }
+            }
+
+            private void onAddSetClicked() {
+                Object v = getItem();
+                if (!(v instanceof SetGroup g)) return;
+                SwimSet created = SetFormDialog.show(workout, null);
+                if (created == null) return;
+                g.addSet(created);
+                rebuildTree();
+                refreshHeader();
+            }
+
+            private void onAddGroupClicked() {
+                Object v = getItem();
+                if (!(v instanceof SetGroup anchor)) return;
+                SetGroup created = SetGroupFormDialog.show(null);
+                if (created == null) return;
+                List<SetGroup> groups = workout.getGroups();
+                int anchorIdx = groups.indexOf(anchor);
+                groups.add(anchorIdx >= 0 ? anchorIdx + 1 : groups.size(), created);
+                normalizeGroupOrders();
+                rebuildTree();
+                refreshHeader();
+            }
+
+            private void onDeleteClicked() {
+                Object v = getItem();
+                if (v instanceof SwimSet s) deleteSet(s);
+                else if (v instanceof SetGroup g) deleteGroup(g);
+            }
+
+            @Override
+            protected void updateItem(Object value, boolean empty) {
+                super.updateItem(value, empty);
+                setText(null);
+                setGraphic(null);
+                setContextMenu(null);
+                if (empty || value == null) return;
+
+                header.getChildren().setAll(title, spacer, btnEdit);
+                card.getChildren().setAll(header);
+                sub.setText("");
+
+                if (value instanceof SetGroup g) {
+                    String reps = (g.getReps() > 1) ? " (x" + g.getReps() + ")" : "";
+                    title.setText(g.getName() + reps);
+                    if (g.getNotes() != null && !g.getNotes().isBlank()) {
+                        sub.setText(g.getNotes());
+                        card.getChildren().add(sub);
+                    }
+                    header.getChildren().addAll(btnAddSet, btnAddGroup);
+                    cmenu.getItems().setAll(miEdit, miAddSet, miAddGroupAfter, new SeparatorMenuItem(), miDelete);
+                    setContextMenu(cmenu);
+                    setGraphic(card);
+
+                } else if (value instanceof SwimSet s) {
+                    String strokeShort = (s.getStroke() == null) ? "" : s.getStroke().getShortLabel();
+                    String effort = (s.getEffort() == null) ? "" : s.getEffort().getLabel();
+                    String tl = s.getReps() + "x" + displayDistance(s) + " " + strokeShort;
+                    if (!effort.isEmpty()) tl += ", " + effort;
+
+                    // interval/goal snippet if present
+                    String timing = "";
+                    if (s.getInterval() != null || s.getGoalTime() != null) {
+                        String at = (s.getInterval() == null) ? "?" : fmtMMSS(s.getInterval());
+                        String goal = (s.getGoalTime() == null) ? "?" : fmtMMSS(s.getGoalTime());
+                        timing = " @ " + at + " (goal " + goal + ")";
+                    }
+                    title.setText(tl + timing);
+
+                    if (s.getNotes() != null && !s.getNotes().isBlank()) {
+                        sub.setText(s.getNotes());
+                        card.getChildren().add(sub);
+                    }
+                    cmenu.getItems().setAll(miEdit, new SeparatorMenuItem(), miDelete);
+                    setContextMenu(cmenu);
+                    setGraphic(card);
+                } else {
+                    setText(value.toString());
+                }
+            }
+        };
+    }
+
+    private void refreshHeader() {
+        String swimmerText = (currentSwimmer == null)
+                ? "Swimmer: -"
+                : "Swimmer: " + nameOrPreferred(currentSwimmer);
+
+        leftHeader.setText(swimmerText);
+
+        if (workout == null) {
+            hdrWorkoutName.setText("Workout: -");
+            hdrWorkoutNotes.setText("");
+            hdrSummaryDistance.setText("-");
+            hdrSummaryDuration.setText("Duration:");
+            hdrSummarySwim.setText("- swimming");
+            hdrSummaryRest.setText("- rest");
+            hdrSummaryTotal.setText("- total");
+            hdrPool.setText("Pool Length: -");
+            return;
+        }
+
+        hdrWorkoutName.setText("Workout: " + workout.getName());
+        hdrWorkoutNotes.setText(workout.getNotes() == null ? "" : workout.getNotes());
+
+        Course c = workout.getCourse();
+        Distance total = computeTotalDistance(workout);
+        long restSec = estimateRestSeconds(workout);
+        long swimSec = (currentSwimmer != null) ? estimateSwimSeconds(workout, currentSwimmer) : 0L;
+        long totalSec = swimSec + restSec;
+
+        hdrSummaryDistance.setText(fmtDistanceForCourse(total, c));
+        hdrSummaryDuration.setText("Duration:");
+        hdrSummarySwim.setText(fmtHMS(swimSec) + " swimming");
+        hdrSummaryRest.setText(fmtHMS(restSec) + " rest");
+        hdrSummaryTotal.setText(fmtHMS(totalSec) + " total");
+
+        String pool = switch (c) { case SCY -> "25 yds"; case SCM -> "25 m"; case LCM -> "50 m"; };
+        hdrPool.setText("Pool Length: " + pool);
+
+        // sync radios to workout
+        switch (c) {
+            case SCY -> rbScy.setSelected(true);
+            case SCM -> rbScm.setSelected(true);
+            case LCM -> rbLcm.setSelected(true);
+        }
+    }
+
+    // === Actions ===
+
+    private void handleAddGroup() {
+        if (workout == null) {
+            new Alert(Alert.AlertType.WARNING, "No active workout. Create a workout first.").showAndWait();
+            return;
+        }
+        SetGroup created = SetGroupFormDialog.show(null);
+        if (created == null) return;
+        workout.getGroups().add(created);
+        normalizeGroupOrders();
+        rebuildTree();
+        refreshHeader();
+    }
+
+    private void handleAddSet() {
+        var sel = workoutTree.getSelectionModel().getSelectedItem();
+        if (sel == null || !(sel.getValue() instanceof SetGroup g)) {
+            new Alert(Alert.AlertType.INFORMATION, "Select a group to add a set.").showAndWait();
+            return;
+        }
+        if (currentSwimmer == null || !currentSwimmer.hasAnySeeds()) {
+            new Alert(Alert.AlertType.WARNING, "Set seed times first (right panel).").showAndWait();
+            return;
+        }
+        SwimSet created = SetFormDialog.show(workout, null);
+        if (created == null) return;
+        g.addSet(created);
+        rebuildTree();
+        refreshHeader();
+    }
+
+    // === Model helpers ===
+
+    public void setWorkout(Workout workout) {
+        this.workout = Objects.requireNonNull(workout);
+        normalizeGroupOrders();
+        rebuildTree();
+        refreshHeader();
+    }
+
+    public void setCurrentSwimmer(Swimmer s) {
+        this.currentSwimmer = s;
+        if (seedPane != null) seedPane.bindSwimmer(s);
+        refreshHeader();
+    }
+
+    private void normalizeGroupOrders() {
+        if (workout == null) return;
+        int order = 1;
+        for (SetGroup g : workout.getGroups()) g.setOrder(order++);
+    }
+
+    private static Distance computeTotalDistance(Workout w) {
+        double meters = 0.0;
+        for (SetGroup g : w.getGroups()) {
+            double perGroupMeters = 0.0;
+            for (SwimSet s : g.getSets()) {
+                perGroupMeters += s.getDistancePerRep().toMeters() * s.getReps();
+            }
+            meters += perGroupMeters * Math.max(g.getReps(), 1);
+        }
+        return Distance.ofMeters(meters);
+    }
+
+    /** Swim time from seed pace. If a set’s stroke seed is missing, it’s skipped. */
+    private static long estimateSwimSeconds(Workout w, Swimmer swimmer) {
+        if (w == null || swimmer == null) return 0L;
+        double totalSeconds = 0.0;
+        for (SetGroup g : w.getGroups()) {
+            int groupReps = Math.max(1, g.getReps());
+            double secondsOneGroup = 0.0;
+            for (SwimSet s : g.getSets()) {
+                double metersPerRep = s.getDistancePerRep().toMeters();
+                double metersTotalSet = metersPerRep * Math.max(1, s.getReps());
+                var seed = swimmer.getSeedTime(s.getStroke());
+                if (seed == null) seed = swimmer.getSeedTime(swimworkoutbuilder_javafx.model.enums.StrokeType.FREESTYLE);
+                if (seed == null) continue;
+                double speedMps = seed.speedMps();
+                if (speedMps > 0) secondsOneGroup += (metersTotalSet / speedMps);
+            }
+            totalSeconds += secondsOneGroup * groupReps;
+        }
+        return Math.round(totalSeconds);
+    }
+
+    /** Rest from (interval − goal) per rep, plus between-set and between-group rest. */
+    private static long estimateRestSeconds(Workout w) {
+        if (w == null) return 0L;
+        long total = 0;
+        for (SetGroup g : w.getGroups()) {
+            int groupReps = Math.max(1, g.getReps());
+
+            long perGroup = 0;
+
+            // rest from interval/goal on each rep
+            for (SwimSet s : g.getSets()) {
+                int reps = Math.max(1, s.getReps());
+                long perRep = 0;
+                TimeSpan interval = s.getInterval();
+                TimeSpan goal = s.getGoalTime();
+                if (interval != null && goal != null) {
+                    long i = interval.toMillis() / 1000;
+                    long gsec = goal.toMillis() / 1000;
+                    perRep = Math.max(0, i - gsec);
+                }
+                perGroup += perRep * reps;
+            }
+
+            // default rest between consecutive sets in the group (if your SetGroup has it)
+            try {
+                var getter = SetGroup.class.getMethod("getRestBetweenSetsSec");
+                int betweenSets = (int) getter.invoke(g);
+                int gaps = Math.max(0, g.getSetCount() - 1);
+                perGroup += (long) Math.max(0, betweenSets) * gaps;
+            } catch (Exception ignored) { /* field may not exist in your variant */ }
+
+            // multiply by number of group repeats
+            perGroup *= groupReps;
+
+            // rest between group repeats
+            perGroup += (long) Math.max(0, g.getRestAfterGroupSec()) * Math.max(0, groupReps - 1);
+
+            total += perGroup;
+        }
+        return total;
+    }
+
+    private static String fmtHMS(long seconds) {
+        long h = seconds / 3600;
+        long m = (seconds % 3600) / 60;
+        long s = seconds % 60;
+        return (h > 0) ? String.format("%d:%02d:%02d", h, m, s)
+                : String.format("%d:%02d", m, s);
+    }
+
+    private static String fmtMMSS(TimeSpan t) {
+        if (t == null) return "?";
+        long ms = t.toMillis();
+        long m = ms / 60000;
+        long s = (ms % 60000) / 1000;
+        return String.format("%d:%02d", m, s);
+    }
+
+    private static String fmtDistanceForCourse(Distance d, Course c) {
+        int yards  = (int) Math.round(d.toYards());
+        int meters = (int) Math.round(d.toMeters());
+        return switch (c) { case SCY -> yards + " yds"; case SCM, LCM -> meters + " m"; };
+    }
+
+    private String displayDistance(SwimSet s) {
+        if (workout != null && workout.getCourse() == Course.SCY) {
+            int yards = (int) Math.round(s.getDistancePerRep().toYards());
+            int snapped = (int) Math.round(yards / 25.0) * 25;
+            return snapped + "yd";
+        }
+        int meters = (int) Math.round(s.getDistancePerRep().toMeters());
+        return meters + "m";
+    }
+
+    private static String nameOrPreferred(Swimmer s) {
+        if (s == null) return "-";
+        String base = s.getFirstName() + " " + s.getLastName();
+        return (s.getPreferredName() == null || s.getPreferredName().isBlank())
+                ? base
+                : s.getPreferredName() + " (" + base + ")";
+    }
+
+    private boolean confirm(String title, String message) {
+        var alert = new Alert(Alert.AlertType.CONFIRMATION, message, ButtonType.OK, ButtonType.CANCEL);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        return alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+    }
+
+    private void deleteSet(SwimSet s) {
+        if (workout == null) return;
+        for (SetGroup g : workout.getGroups()) {
+            if (g.getSets().remove(s)) { rebuildTree(); refreshHeader(); return; }
+        }
+    }
+
+    private void deleteGroup(SetGroup g) {
+        if (workout == null) return;
+        workout.getGroups().remove(g);
+        normalizeGroupOrders();
+        rebuildTree();
+        refreshHeader();
+    }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./state/AppState.java
+package swimworkoutbuilder_javafx.state;
+
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.Workout;
+
+public final class AppState {
+    private static final AppState INSTANCE = new AppState();
+    public static AppState get() { return INSTANCE; }
+    private AppState() {}
+
+    private final ObjectProperty<Swimmer> currentSwimmer = new SimpleObjectProperty<>(null);
+    private final ObjectProperty<Workout> currentWorkout = new SimpleObjectProperty<>(null);
+
+    public ObjectProperty<Swimmer> currentSwimmerProperty() { return currentSwimmer; }
+    public Swimmer getCurrentSwimmer() { return currentSwimmer.get(); }
+    public void setCurrentSwimmer(Swimmer s) { currentSwimmer.set(s); }
+
+    public ObjectProperty<Workout> currentWorkoutProperty() { return currentWorkout; }
+    public Workout getCurrentWorkout() { return currentWorkout.get(); }
+    public void setCurrentWorkout(Workout w) { currentWorkout.set(w); }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./Main.java
+
+package swimworkoutbuilder_javafx;
+
+import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+import swimworkoutbuilder_javafx.ui.MainView;
+
+public class Main extends Application {
+    @Override
+    public void start(Stage stage) {
+        MainView root = new MainView();
+        stage.setTitle("SwimWorkoutBuilder (JavaFX-only)");
+        stage.setScene(new Scene(root, 1180, 720));
+        stage.show();
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/Workout.java
+package swimworkoutbuilder_javafx.model;
+
+import swimworkoutbuilder_javafx.model.enums.Course;
+import swimworkoutbuilder_javafx.model.units.Distance;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+
+/**
+ * Represents a structured swim workout for a specific swimmer.
+ *
+ * <p>{@code Workout} acts as a top-level container for all workout content —
+ * including metadata (name, notes, course) and a sequence of {@link SetGroup}s.
+ * It does not perform any pace or timing logic; those calculations are handled by
+ * the {@link swimworkoutbuilder.model.pacing.PacePolicy} implementations.</p>
+ *
+ * <h2>Responsibilities</h2>
+ * <ul>
+ *   <li>Encapsulate all metadata describing a workout (name, course, notes, swimmer ID).</li>
+ *   <li>Contain an ordered list of {@link SetGroup}s representing warmup, main, and cooldown phases.</li>
+ *   <li>Provide helper methods for reordering and measuring total workout distance.</li>
+ *   <li>Ensure all instances are associated with a swimmer via {@code swimmerId}.</li>
+ * </ul>
+ *
+ * <h2>Design Notes</h2>
+ * <ul>
+ *   <li>Workouts are immutable in ID but mutable in content (groups can be edited or rearranged).</li>
+ *   <li>Distances are measured canonically in meters via {@link Distance} for consistency.</li>
+ *   <li>This class is model-only; the UI and pacing logic are defined elsewhere.</li>
+ * </ul>
+ *
+ * <h2>Typical Usage</h2>
+ * <pre>{@code
+ * UUID swimmerId = swimmer.getId();
+ * Workout w = new Workout(swimmerId, "Tuesday Threshold", Course.SCY);
+ *
+ * SetGroup warmup = new SetGroup("Warmup", 1, 1);
+ * warmup.addSet(new SwimSet(StrokeType.FREESTYLE, 4, Distance.ofYards(50), Effort.EASY, w.getCourse(), "Smooth strokes"));
+ *
+ * w.addSetGroup(warmup);
+ * System.out.println(w.totalDistance());
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version MVP 1.0 (October 2025)
+ * @see SetGroup
+ * @see swimworkoutbuilder.model.pacing.PacePolicy
+ */
+public class Workout implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
+
+    // ----------------------------------------------------------
+    // Identity & metadata
+    // ----------------------------------------------------------
+
+    private final UUID id;                    // Unique workout ID
+    private UUID swimmerId;                   // The swimmer this workout belongs to
+    private String name;                      // e.g., "Tuesday Threshold"
+    private Course course;                    // SCY, SCM, or LCM
+    private String notes;                     // Optional workout-level notes (theme, focus)
+
+    // Defaults (used by printer between groups)
+    private int defaultRestBetweenGroupsSeconds = 0;
+
+    // Contents
+    private final List<SetGroup> groups = new ArrayList<>();
+
+    // ----------------------------------------------------------
+    // Constructors
+    // ----------------------------------------------------------
+
+    /**
+     * Creates a new workout with minimal metadata.
+     *
+     * @param swimmerId the swimmer this workout belongs to
+     * @param name the descriptive name of the workout (e.g. "Tuesday Threshold")
+     * @param course the pool course type (SCY, SCM, or LCM)
+     */
+    public Workout(UUID swimmerId, String name, Course course) {
+        this.id = UUID.randomUUID();
+        this.swimmerId = Objects.requireNonNull(swimmerId, "swimmerId");
+        this.name = Objects.requireNonNull(name, "name");
+        this.course = Objects.requireNonNull(course, "course");
+    }
+
+    /**
+     * Creates a workout with full metadata and default rest settings.
+     *
+     * @param swimmerId the swimmer this workout belongs to
+     * @param name descriptive workout name
+     * @param course pool course type (SCY, SCM, or LCM)
+     * @param notes optional notes or theme
+     * @param defaultRestBetweenGroupsSeconds default rest between consecutive groups (≥0)
+     */
+    public Workout(UUID swimmerId, String name, Course course, String notes, int defaultRestBetweenGroupsSeconds) {
+        this.id = UUID.randomUUID();
+        this.swimmerId = Objects.requireNonNull(swimmerId, "swimmerId");
+        this.name = Objects.requireNonNull(name, "name");
+        this.course = Objects.requireNonNull(course, "course");
+        this.notes = notes;
+        this.defaultRestBetweenGroupsSeconds = Math.max(0, defaultRestBetweenGroupsSeconds);
+    }
+
+    // ----------------------------------------------------------
+    // Basic getters/setters
+    // ----------------------------------------------------------
+
+    /** Unique identifier for this workout (immutable once created). */
+    public UUID getId() { return id; }
+
+    public UUID getSwimmerId() { return swimmerId; }
+    public void setSwimmerId(UUID swimmerId) { this.swimmerId = Objects.requireNonNull(swimmerId, "swimmerId"); }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = Objects.requireNonNull(name, "name"); }
+
+    public Course getCourse() { return course; }
+    public void setCourse(Course course) { this.course = Objects.requireNonNull(course, "course"); }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+
+    public int getDefaultRestBetweenGroupsSeconds() { return defaultRestBetweenGroupsSeconds; }
+    public void setDefaultRestBetweenGroupsSeconds(int seconds) {
+        this.defaultRestBetweenGroupsSeconds = Math.max(0, seconds);
+    }
+
+    // ----------------------------------------------------------
+    // Group management (ordered & mutable)
+    // ----------------------------------------------------------
+
+    /** Returns the list of {@link SetGroup}s that make up this workout. */
+    public List<SetGroup> getGroups() { return groups; }
+
+    /** Returns how many groups this workout currently contains. */
+    public int getGroupCount() { return groups.size(); }
+
+    /** Appends a new group to the workout. Null values are ignored. */
+    public void addSetGroup(SetGroup group) {
+        if (group != null) groups.add(group);
+    }
+
+    /** Inserts a group at a specific index (throws if index invalid). */
+    public void insertSetGroup(int index, SetGroup group) {
+        if (group == null) return;
+        groups.add(index, group);
+    }
+
+    /** Removes and returns the group at the specified index. */
+    public SetGroup removeSetGroup(int index) {
+        return groups.remove(index);
+    }
+
+    /** Moves a group from one index to another, preserving relative order. */
+    public void moveGroup(int fromIndex, int toIndex) {
+        if (fromIndex == toIndex) return;
+        SetGroup g = groups.remove(fromIndex);
+        groups.add(toIndex, g);
+    }
+
+    /** Swaps the position of two groups in the list. */
+    public void swapGroups(int i, int j) {
+        if (i == j) return;
+        SetGroup a = groups.get(i);
+        SetGroup b = groups.get(j);
+        groups.set(i, b);
+        groups.set(j, a);
+    }
+
+    // ----------------------------------------------------------
+    // Distance helpers
+    // ----------------------------------------------------------
+
+    /**
+     * Returns the total distance for one full pass through all groups.
+     * <p>Uses the canonical meter-based representation via {@link Distance}.</p>
+     */
+    public Distance singlePassDistance() {
+        return Distance.ofMeters(singlePassDistanceMeters());
+    }
+
+    /**
+     * Returns the total distance of the entire workout, including
+     * any group repetitions (e.g., “Main ×4” counts 4× its base distance).
+     */
+    public Distance totalDistance() {
+        return Distance.ofMeters(totalDistanceMeters());
+    }
+
+    /** Sum of group distances (in meters) for one pass. */
+    @Deprecated
+    public int singlePassDistanceMeters() {
+        int sum = 0;
+        for (SetGroup g : groups) sum += g.singlePassDistanceMeters();
+        return sum;
+    }
+
+    /** Total workout distance (in meters), including group repetitions. */
+    @Deprecated
+    public int totalDistanceMeters() {
+        int sum = 0;
+        for (SetGroup g : groups) sum += g.totalDistanceMeters();
+        return sum;
+    }
+
+    // ----------------------------------------------------------
+    // Object overrides
+    // ----------------------------------------------------------
+
+    @Override
+    public String toString() {
+        return "Workout{" +
+                "id=" + id +
+                ", swimmerId=" + swimmerId +
+                ", name='" + name + '\'' +
+                ", course=" + course +
+                ", groups=" + groups.size() +
+                ", defaultRestBetweenGroupsSeconds=" + defaultRestBetweenGroupsSeconds +
+                (notes != null && !notes.isBlank() ? ", notes='" + notes + '\'' : "") +
+                '}';
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/repository/SwimmerRepository.java
+package swimworkoutbuilder_javafx.model.repository;
+
+import swimworkoutbuilder_javafx.model.Swimmer;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Repository for managing swimmers.
+ *
+ * <p>This class provides persistence and retrieval of {@link Swimmer} data.
+ * Swimmer profiles are stored in a simple CSV file located in the application's data directory
+ * The repository ensures that the folder and file exist before attempting read/write operations.
+ *
+ * <p><b>Responsibilities:</b>
+ * <ul>
+ *     <li> Load swimmers from CSV into memory.</li>
+ *     <li> Save swimmers back to CSV.</li>
+ *     <li>Create the necessary directory and file if they do not exist.</li>
+ *     <li> Very simple CSV escaping (quotes only).</li>
+ * </ul>
+ *
+ * <p><b>Design Notes:</b>
+ * <ul>
+ *     <li>CSV storage is deliberately minimal to reduce dependencies. Future versions may support JSON or database-backed persistence.</li>
+ *     <li>Escaping is basic and intended only to handle commas and quotes in swimmer names - it is not intended as a general CSV solution.</li>
+ * </ul>
+ *
+ * <p><b>Usage Example:</b>
+ * <pre>{@code
+ * SwimmerRepository repo = SwimmerRepository.getInstance();
+ * List<Swimmer> swimmers = repo.loadAll();
+ *
+ * Swimmer parker = new Swimmer("Parker", "Blackwell", " ", "Indy Aquatic Masters");
+ * swimmers.add(parker);
+ *
+ * repo.saveAll(swimmers);
+ * }</pre>
+ *
+ * @author parkerblackwell
+ * @version 1.0
+ * @since 2025-10-03
+ * @see Swimmer
+ */
+public final class SwimmerRepository {
+
+    // private no-arg constructor: can't create instances of SwimmerRepository, "SwimmerRepositor repo = new SwimmerRepository()" is not allowed.
+    private SwimmerRepository() {}
+
+   // ----- File management helpers
+    /** Builds the path based on the user's system ~/.swimworkoutbuilder/swimmers.csv */
+    public static Path dataDir() {
+        String home = System.getProperty("user.home");         // e.g., /Users/parkerblackwell
+        return Paths.get(home, ".swimworkoutbuilder");  // e.g., /Users/parkerblackwell/.swimworkoutbuilder
+    }
+    private static Path swimmersFile() {                        //  e.g., /Users/parkerblackwell/.swimworkoutbuilder/swimmers.csv
+        return dataDir().resolve("swimmers.csv");         // .resolve appends "swimmers.csv" to the path,
+    }
+
+    /** Helper method to ensure data directory and swimmers.csv exists.  If not, create with header row. */
+    private static void ensureFileReady() throws IOException {
+        Files.createDirectories(dataDir());
+        Path f = swimmersFile();
+        if (Files.notExists(f)) {
+            Files.write(f, Collections.singletonList("id,first,last,preferred,team"),
+                    StandardCharsets.UTF_8, StandardOpenOption.CREATE);
+        }
+    }
+
+    // ----- CSV 'escaping' helpers: q -> writing to CSV, uq -> reading from CSV */
+    /** Wrap a string in quotes and replace quotes inside a string with double quotes. */
+    private static String q(String s) {
+        if (s == null) return "";
+        String esc = s.replace("\"", "\"\"");
+        return "\"" + esc + "\"";
+    }
+    /** Unescape CSV: strip surrounding quotes and restore doubled "" to ". */
+    private static String uq(String s) {
+        if (s == null) return null;
+        if (s.length() >= 2 && s.startsWith("\"") && s.endsWith("\"")) {
+            s = s.substring(1, s.length() - 1).replace("\"\"", "\"");
+        }
+        return s.isEmpty() ? null : s;
+    }
+
+    /** Parses one line of CSV text into columns.  Handles commas inside quotes (e.g., "Smith, Jr."). */
+    private static String[] parseCsvLine(String line) {
+        List<String> cols = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        boolean inQuote = false;
+
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"') {
+                inQuote = !inQuote;
+                cur.append(c);
+            } else if (c == ',' && !inQuote) {
+                cols.add(cur.toString());   // finish one column
+                cur.setLength(0);           // reset buffer
+            } else {
+                cur.append(c);
+            }
+        }
+        cols.add(cur.toString());           // add last column
+        return cols.toArray(new String[0]);
+    }
+
+    // ----- Public API
+    /** Load swimmers from CSV into memory (ignore invalid lines). */
+    public static List<Swimmer> loadAll() throws IOException {
+        ensureFileReady();      // Folder / file exists, if not create it
+
+        /** Use BufferedReader to read the file line-by-line. */
+        try (BufferedReader reader = Files.newBufferedReader(swimmersFile(), StandardCharsets.UTF_8)) {
+            List<String> lines = reader.lines().collect(Collectors.toList());
+            if (lines.isEmpty()) return Collections.emptyList();
+
+            List<Swimmer> out = new ArrayList<>();
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i).trim();
+                if (line.isEmpty()) continue;
+                if (i == 0 && line.startsWith("id,")) continue; // skip header
+                if (line.startsWith("#")) continue;             // allow comments
+
+                String[] cols = parseCsvLine(line);
+                if (cols.length < 5) {
+                    System.err.println("WARNING: Skipping invalid line in swimmers.csv: " + line);
+                    continue;
+                }
+                UUID id = UUID.fromString(uq(cols[0].trim()));
+                String first = uq(cols[1]);
+                String last = uq(cols[2]);
+                String preferred = uq(cols[3]);
+                String team = uq(cols[4]);
+                if (first == null || last == null) {
+                    System.err.println("WARNING: Skipping invalid line in swimmers.csv: " + line);
+                    continue;
+                }
+                out.add(new Swimmer(id, first, last, preferred, team));  // Use UUID-aware constructor
+            }
+            return out;
+        }
+    }
+
+    /** Append a swimmer to the CSV. */
+    public static void append(Swimmer s) throws IOException {
+        ensureFileReady();
+        String line = String.join(",",
+                q(s.getId().toString()),
+                q(s.getFirstName()),
+                q(s.getLastName()),
+                q(s.getPreferredName()),
+                q(s.getTeamName())
+        );
+        Files.write(
+                swimmersFile(),
+                Collections.singletonList(line + System.lineSeparator()),
+                StandardCharsets.UTF_8,
+                StandardOpenOption.APPEND
+        );
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/Swimmer.java
+package swimworkoutbuilder_javafx.model;
+
+import swimworkoutbuilder_javafx.model.enums.StrokeType;
+import swimworkoutbuilder_javafx.model.pacing.SeedPace;
+import swimworkoutbuilder_javafx.model.units.Distance;
+import swimworkoutbuilder_javafx.model.units.TimeSpan;
+
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.Collections;
+
+/**
+ * Represents an individual swimmer with personal details and performance data.
+ */
+public class Swimmer implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
+    private final UUID id;
+    private String firstName;
+    private String lastName;
+    private String preferredName;   // optional / nullable
+    private String teamName;        // optional / nullable
+    private final Map<StrokeType, SeedPace> seedPaces = new EnumMap<>(StrokeType.class);
+
+
+    // --- Constructors ---
+
+    public Swimmer(String firstName, String lastName) {
+        this(UUID.randomUUID(), firstName, lastName, null, null);
+    }
+
+    public Swimmer(String firstName, String lastName, String preferredName, String teamName) {
+        this(UUID.randomUUID(), firstName, lastName, preferredName, teamName);
+    }
+
+    // UUID-aware constructor (e.g., repository load)
+    public Swimmer(UUID id, String firstName, String lastName, String preferredName, String teamName) {
+        if (id == null) throw new IllegalArgumentException("id must not be null");
+        this.id = id;
+        this.firstName = Objects.requireNonNull(firstName, "firstName");
+        this.lastName  = Objects.requireNonNull(lastName, "lastName");
+        this.preferredName = preferredName;
+        this.teamName = teamName;
+    }
+
+    // --- Identity ---
+
+    public UUID getId() { return id; }
+    public String getFirstName() { return firstName; }
+    public String getLastName() { return lastName; }
+    public String getPreferredName() { return preferredName; }
+    public String getTeamName() { return teamName; }
+
+    public void setFirstName(String firstName) { this.firstName = Objects.requireNonNull(firstName, "firstName"); }
+    public void setLastName(String lastName) { this.lastName = Objects.requireNonNull(lastName, "lastName"); }
+    public void setPreferredName(String preferredName) { this.preferredName = preferredName; }
+    public void setTeamName(String teamName) { this.teamName = teamName; }
+
+    // --- Seeds (per stroke) ---
+
+    // === Add these inside class Swimmer (alongside your existing seed methods) ===
+
+    /** Read-only view of all seeds (used by UI to show/edit the table). */
+    public Map<StrokeType, SeedPace> getSeedPaces() {
+        return Collections.unmodifiableMap(seedPaces);
+    }
+
+    /** Replace all seeds at once (used by Seed dialog Save). */
+    public void setAllSeedPaces(Map<StrokeType, SeedPace> src) {
+        seedPaces.clear();
+        if (src != null) seedPaces.putAll(src);
+    }
+
+    /** Convenience flag: do we have at least one seed? */
+    public boolean hasAnySeeds() {
+        return !seedPaces.isEmpty();
+    }
+
+    /** Alias used by some UI code; equivalent to updateSeedTime(). */
+    public void setSeedPace(StrokeType stroke, SeedPace pace) {
+        updateSeedTime(stroke, pace);
+    }
+
+    /** Returns the baseline seed for the given stroke, or null if not set. */
+    public SeedPace getSeedTime(StrokeType stroke) {
+        Objects.requireNonNull(stroke, "stroke");
+        return seedPaces.get(stroke);
+    }
+
+    /** Creates or replaces the baseline seed for the given stroke. */
+    public void updateSeedTime(StrokeType stroke, SeedPace seed) {
+        Objects.requireNonNull(stroke, "stroke");
+        Objects.requireNonNull(seed,   "seed");
+        seedPaces.put(stroke, seed);
+    }
+
+    /** Convenience: set a seed defined as "per 100 yards" in seconds. */
+    public void updateSeed100Y(StrokeType stroke, double secondsPer100Y) {
+        Objects.requireNonNull(stroke, "stroke");
+        if (secondsPer100Y <= 0) throw new IllegalArgumentException("secondsPer100Y must be > 0");
+        updateSeedTime(stroke, new SeedPace(Distance.ofYards(100), TimeSpan.ofSeconds(secondsPer100Y)));
+    }
+
+    /** Convenience: set a seed defined as "per 100 meters" in seconds. */
+    public void updateSeed100M(StrokeType stroke, double secondsPer100M) {
+        Objects.requireNonNull(stroke, "stroke");
+        if (secondsPer100M <= 0) throw new IllegalArgumentException("secondsPer100M must be > 0");
+        updateSeedTime(stroke, new SeedPace(Distance.ofMeters(100), TimeSpan.ofSeconds(secondsPer100M)));
+    }
+
+    /** Convenience: explicit distance + time overload (e.g., 200m in 120.0s). */
+    public void updateSeedTime(StrokeType stroke, Distance seedDistance, TimeSpan seedTime) {
+        Objects.requireNonNull(stroke, "stroke");
+        Objects.requireNonNull(seedDistance, "seedDistance");
+        Objects.requireNonNull(seedTime,     "seedTime");
+        updateSeedTime(stroke, new SeedPace(seedDistance, seedTime));
+    }
+
+    public boolean hasSeed(StrokeType stroke) {
+        Objects.requireNonNull(stroke, "stroke");
+        return seedPaces.containsKey(stroke);
+    }
+
+    public void clearSeed(StrokeType stroke) {
+        Objects.requireNonNull(stroke, "stroke");
+        seedPaces.remove(stroke);
+    }
+
+    /** Removes all seeds for this swimmer. */
+    public void clearAllSeeds() { seedPaces.clear(); }
+
+    // --- Derived helpers ---
+
+    /** Returns canonical speed (m/s) for a stroke, or NaN if no seed set. */
+    public double speedMps(StrokeType stroke) {
+        Objects.requireNonNull(stroke, "stroke");
+        SeedPace s = seedPaces.get(stroke);
+        return (s == null) ? Double.NaN : s.speedMps();
+    }
+
+    /** Returns true if all four primary strokes have seeds set. */
+    public boolean hasCoreSeeds() {
+        return hasSeed(StrokeType.FREESTYLE)
+                && hasSeed(StrokeType.BACKSTROKE)
+                && hasSeed(StrokeType.BREASTSTROKE)
+                && hasSeed(StrokeType.BUTTERFLY);
+    }
+
+    @Override
+    public String toString() {
+        return "Swimmer(" +
+                "id=" + id + ", " +
+                "name=" + firstName + " " + lastName + ", " +
+                "preferredName=" + (preferredName == null ? "" : preferredName) + ", " +
+                "teamName=" + (teamName == null ? "" : teamName) + ", " +
+                "seedPaces=" + seedPaces +
+                ')';
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/SwimSet.java
+package swimworkoutbuilder_javafx.model;
+
+import swimworkoutbuilder_javafx.model.enums.Course;
+import swimworkoutbuilder_javafx.model.enums.Effort;
+import swimworkoutbuilder_javafx.model.enums.Equipment;
+import swimworkoutbuilder_javafx.model.enums.StrokeType;
+import swimworkoutbuilder_javafx.model.units.Distance;
+
+import java.util.EnumSet;
+import java.util.Set;
+
+/**
+ * Represents a single structured training set within a workout,
+ * such as <b>“8 × 50 Freestyle @ Endurance”</b>.
+ *
+ * <p>Each {@code SwimSet} defines the fundamental elements required to compute
+ * pacing, rest, and interval timing:
+ * <ul>
+ *   <li>{@link StrokeType} – which stroke or skill the set trains (e.g., FREESTYLE, DRILL, KICK)</li>
+ *   <li>{@code reps} – how many times the distance repeats</li>
+ *   <li>{@link Distance} – exact distance per repetition (canonical in meters)</li>
+ *   <li>{@link Effort} – pacing intensity (EASY, THRESHOLD, RACE_PACE, etc.)</li>
+ *   <li>{@link Course} – pool length and type (SCY, SCM, LCM)</li>
+ *   <li>{@link Equipment} – optional training gear (fins, paddles, etc.)</li>
+ * </ul></p>
+ *
+ * <h2>Responsibilities</h2>
+ * <ul>
+ *   <li>Ensure that all distances are valid legal multiples of the course length.</li>
+ *   <li>Preserve canonical internal precision using {@link Distance}’s fixed-point model.</li>
+ *   <li>Store metadata used by higher-level components like {@link swimworkoutbuilder.model.pacing.DefaultPacePolicy}.</li>
+ *   <li>Support immutability of key distance and equipment attributes through controlled setters.</li>
+ * </ul>
+ *
+ * <h2>Design Notes</h2>
+ * <ul>
+ *   <li>{@link Distance} ensures exact math using integer micro-units (0.0001 m precision).</li>
+ *   <li>Distances are “snapped up” to legal pool multiples to maintain realistic workout structure.
+ *       For example, a 75 m request in a 50 m pool becomes 100 m.</li>
+ *   <li>Equipment is modeled as an {@link EnumSet} to efficiently represent multiple active aids.</li>
+ * </ul>
+ *
+ * <h2>Example</h2>
+ * <pre>{@code
+ * SwimSet mainSet = new SwimSet(
+ *     StrokeType.FREESTYLE,
+ *     8,
+ *     Distance.ofYards(50),
+ *     Effort.THRESHOLD,
+ *     Course.SCY,
+ *     "Descend 1–4"
+ * );
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version MVP 1.0 (October 2025)
+ * @see swimworkoutbuilder.model.units.Distance
+ * @see swimworkoutbuilder.model.enums.Course
+ * @see swimworkoutbuilder.model.enums.Effort
+ * @see swimworkoutbuilder.model.enums.StrokeType
+ * @see swimworkoutbuilder.model.enums.Equipment
+ */
+public class SwimSet implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
+
+    private StrokeType stroke;
+    private int reps;
+    private Distance distancePerRep; // exact canonical distance per repetition
+    private Effort effort;
+    private String notes;            // optional user notes
+    private Course course;           // pool context for snapping distance
+    private Set<Equipment> equipment = EnumSet.noneOf(Equipment.class); // defaults to none
+
+    // inside class SwimSet (add with your other fields)
+    private swimworkoutbuilder_javafx.model.units.TimeSpan interval;   // nullable
+    private swimworkoutbuilder_javafx.model.units.TimeSpan goalTime;   // nullable
+
+    public swimworkoutbuilder_javafx.model.units.TimeSpan getInterval() { return interval; }
+    public void setInterval(swimworkoutbuilder_javafx.model.units.TimeSpan interval) { this.interval = interval; }
+
+    public swimworkoutbuilder_javafx.model.units.TimeSpan getGoalTime() { return goalTime; }
+    public void setGoalTime(swimworkoutbuilder_javafx.model.units.TimeSpan goalTime) { this.goalTime = goalTime; }
+    // ----------------------------------------------------------
+    // Constructors
+    // ----------------------------------------------------------
+
+    /**
+     * Creates a new {@code SwimSet} with all core properties specified.
+     *
+     * <p>Performs validation on reps, distance, and course,
+     * and snaps the given distance up to the nearest legal pool multiple
+     * based on the course length (e.g., rounding 75 m to 100 m in a 50 m pool).</p>
+     *
+     * @param stroke stroke type (e.g., FREESTYLE, BACKSTROKE)
+     * @param reps number of repetitions (must be ≥ 1)
+     * @param distancePerRep distance for each repetition
+     * @param effort intensity level of the set
+     * @param course course type (SCY, SCM, or LCM)
+     * @param notes optional descriptive text
+     * @throws IllegalArgumentException if {@code reps < 1} or distance/course are invalid
+     */
+    public SwimSet(StrokeType stroke,
+                   int reps,
+                   Distance distancePerRep,
+                   Effort effort,
+                   Course course,
+                   String notes) {
+        if (reps < 1) throw new IllegalArgumentException("reps must be >= 1");
+        if (distancePerRep == null || distancePerRep.rawMicroUnits() <= 0)
+            throw new IllegalArgumentException("distancePerRep must be > 0");
+        if (course == null) throw new IllegalArgumentException("course must not be null");
+
+        this.stroke = stroke;
+        this.reps = reps;
+        this.effort = effort;
+        this.notes = (notes == null ? "" : notes);
+        this.course = course;
+        this.distancePerRep = snapUpToCourseMultiple(distancePerRep, course);
+    }
+
+    /** Convenience constructor for sets without notes. */
+    public SwimSet(StrokeType stroke,
+                   int reps,
+                   Distance distancePerRep,
+                   Effort effort,
+                   Course course) {
+        this(stroke, reps, distancePerRep, effort, course, "");
+    }
+
+    // ----------------------------------------------------------
+    // Accessors and mutators
+    // ----------------------------------------------------------
+
+    public StrokeType getStroke() { return stroke; }
+    public void setStroke(StrokeType stroke) { this.stroke = stroke; }
+
+    public int getReps() { return reps; }
+    public void setReps(int reps) {
+        if (reps < 1) throw new IllegalArgumentException("reps must be >= 1");
+        this.reps = reps;
+    }
+
+    public Distance getDistancePerRep() { return distancePerRep; }
+    public void setDistancePerRep(Distance distancePerRep) {
+        if (distancePerRep == null || distancePerRep.rawMicroUnits() <= 0)
+            throw new IllegalArgumentException("distancePerRep must be > 0");
+        this.distancePerRep = snapUpToCourseMultiple(distancePerRep, this.course);
+    }
+
+    public Effort getEffort() { return effort; }
+    public void setEffort(Effort effort) { this.effort = effort; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = (notes == null ? "" : notes); }
+
+    public Course getCourse() { return course; }
+    public void setCourse(Course course) {
+        if (course == null) throw new IllegalArgumentException("course must not be null");
+        this.course = course;
+        // Resnap distance whenever the course changes (e.g., switching SCY → LCM)
+        this.distancePerRep = snapUpToCourseMultiple(this.distancePerRep, this.course);
+    }
+
+    public Set<Equipment> getEquipment() { return equipment; }
+    public void setEquipment(Set<Equipment> equipment) {
+        this.equipment = (equipment == null)
+                ? EnumSet.noneOf(Equipment.class)
+                : EnumSet.copyOf(equipment);
+    }
+
+    public void addEquipment(Equipment e) {
+        if (e == null) return;
+        if (equipment == null) equipment = EnumSet.noneOf(Equipment.class);
+        equipment.add(e);
+    }
+
+    public void removeEquipment(Equipment e) {
+        if (e == null || equipment == null) return;
+        equipment.remove(e);
+    }
+
+    public boolean hasEquipment(Equipment e) {
+        return equipment != null && equipment.contains(e);
+    }
+
+    // ----------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------
+
+    /**
+     * Snaps a distance upward to the nearest legal pool multiple for the specified course.
+     * <p>Uses integer math in canonical 0.0001 m units, ensuring there is no rounding drift.</p>
+     *
+     * @param distance the distance to normalize
+     * @param course the pool course (e.g., 25 yd, 25 m, 50 m)
+     * @return a new {@link Distance} object rounded up to the nearest course multiple
+     */
+    private static Distance snapUpToCourseMultiple(Distance distance, Course course) {
+        Distance poolLen = course.getLength();
+        long d = distance.rawMicroUnits();
+        long p = poolLen.rawMicroUnits();
+        if (p <= 0) return distance; // safety guard
+
+        long multiples = d / p;
+        if (d % p != 0) multiples++; // round UP
+        long snapped = Math.max(p, Math.multiplyExact(multiples, p)); // ensure ≥ 1 pool length
+
+        // Preserve user’s preferred display unit
+        return Distance.ofCanonicalMicroUnits(snapped, distance.displayUnit());
+    }
+
+    @Override
+    public String toString() {
+        return "SwimSet{" +
+                "stroke=" + stroke +
+                ", reps=" + reps +
+                ", distancePerRep=" + distancePerRep +
+                ", effort=" + effort +
+                ", course=" + course +
+                (equipment != null && !equipment.isEmpty() ? ", equipment=" + equipment : "") +
+                (notes != null && !notes.isBlank() ? ", notes='" + notes + '\'' : "") +
+                '}';
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/enums/Equipment.java
+package swimworkoutbuilder_javafx.model.enums;
+
+import java.util.Set;
+
+/**
+ * Equipment factors adjust target pace calculations to account for training aids.
+ * Multipliers are applied as part of the pace policy, and multiple pieces of
+ * equipment can be combined (multipliers multiplied together).
+ *
+ * Typical defaults (tunable):
+ *  - FINS:       0.88 (faster, strong kick propulsion)
+ *  - PADDLES:    0.96 (slightly faster, more pull power)
+ *  - PULL_BUOY:  1.05 (slower overall pace, less kick drive)
+ *  - SNORKEL:    0.99 (neutral to slightly slower)
+ *  - DRAG_SOCKS: 1.15 (slower due to resistance)
+ *  - PARACHUTE:  1.20 (significantly slower due to resistance)
+ */
+public enum Equipment {
+    FINS("Fins", 0.88),
+    PADDLES("Paddles", 0.96),
+    PULL_BUOY("Pull Buoy", 1.05),
+    SNORKEL("Snorkel", 0.99),
+    DRAG_SOCKS("Drag Socks", 1.15),
+    PARACHUTE("Parachute", 1.20);
+
+    private final String label;
+    private final double multiplier;
+
+    Equipment(String label, double multiplier) {
+        this.label = label;
+        this.multiplier = multiplier;
+    }
+
+    /** User-friendly label for UI display. */
+    public String getLabel() { return label; }
+
+    /** Performance multiplier for this equipment. */
+    public double multiplier() { return multiplier; }
+
+    /**
+     * Compute the combined multiplier for a set of equipment items.
+     * If the set is null or empty, returns 1.0 (neutral).
+     */
+    public static double combinedMultiplier(Set<Equipment> equipment) {
+        if (equipment == null || equipment.isEmpty()) return 1.0;
+        double m = 1.0;
+        for (Equipment e : equipment) {
+            if (e != null) m *= e.multiplier;
+        }
+        return m;
+    }
+
+    @Override
+    public String toString() { return label; }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/enums/DistanceFactors.java
+package swimworkoutbuilder_javafx.model.enums;
+
+import swimworkoutbuilder_javafx.model.units.Distance;
+
+/**
+ * DistanceFactors provides multipliers to adjust target pace
+ * depending on repeat distance. Short reps are faster than seed,
+ * longer reps trend slower.
+ *
+ * Distances are stored as exact Distance values (canonical 0.0001 m units).
+ * Multipliers are applied during pace calculations.
+ *
+ * To do: add a fallback calculation for distances outside the buckets.
+ */
+public enum DistanceFactors {
+    D25 (Distance.ofMeters(25),    0.92),
+    D50 (Distance.ofMeters(50),    0.94),
+    D75 (Distance.ofMeters(75),    0.97),
+    D100(Distance.ofMeters(100),   1.00),
+    D200(Distance.ofMeters(200),   1.05),
+    D400(Distance.ofMeters(400),   1.10),
+    D800(Distance.ofMeters(800),   1.15),
+    D1500(Distance.ofMeters(1500), 1.20);
+
+    private final Distance distance;
+    private final double multiplier;
+
+    DistanceFactors(Distance distance, double multiplier) {
+        this.distance = distance;
+        this.multiplier = multiplier;
+    }
+
+    /** Returns the canonical distance (exact) this factor is defined for. */
+    public Distance distance() { return distance; }
+
+    /** Returns the multiplier applied at this distance. */
+    public double multiplier() { return multiplier; }
+
+    /**
+     * Get the pace multiplier for an arbitrary distance.
+     * Uses distance buckets (rounded up to the nearest defined distance)
+     * to approximate performance trends.
+     */
+    public static double forDistance(Distance d) {
+        long meters = Math.round(d.toMeters());
+        if (meters <= 25)   return D25.multiplier;
+        if (meters <= 50)   return D50.multiplier;
+        if (meters <= 75)   return D75.multiplier;
+        if (meters <= 100)  return D100.multiplier;
+        if (meters <= 200)  return D200.multiplier;
+        if (meters <= 400)  return D400.multiplier;
+        if (meters <= 800)  return D800.multiplier;
+        return D1500.multiplier; // default for anything longer
+    }
+
+    @Override
+    public String toString() {
+        return Math.round(distance.toMeters()) + "m (" + multiplier + ")";
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/enums/Course.java
+package swimworkoutbuilder_javafx.model.enums;
+
+import swimworkoutbuilder_javafx.model.units.Distance;
+
+/**
+ * Represents the type of swimming course (i.e., pool length).
+ *
+ * SCY = Short Course Yards (25 yards)
+ * SCM = Short Course Meters (25 meters)
+ * LCM = Long Course Meters (50 meters)
+ *
+ * v2: added performance multiplier used by pace calculation.
+ * SC pools have more turns, which means more push-offs and more underwaters as a percentage
+ * of the distance compared to an LC pool.
+ *
+ * Typical defaults:
+ *  - SCY: 1.00 (25y: more turns, more underwater as a percentage of distance)
+ *  - SCM: 1.04 (25m: underwater % slightly less than SCY)
+ *  - LCM: 1.07 (50m: half as many turns as SCY/SCM, less underwater vs. surface swimming)
+ */
+public enum Course {
+    SCY("Short Course Yards", Distance.ofYards(25), CourseUnit.YARDS, 1.00),
+    SCM("Short Course Meters", Distance.ofMeters(25), CourseUnit.METERS, 1.04),
+    LCM("Long Course Meters", Distance.ofMeters(50), CourseUnit.METERS, 1.07);
+
+    private final String description;
+    private final Distance length;      // pool length as exact Distance
+    private final CourseUnit unit;
+    private final double multiplier;    // performance multiplier
+
+    Course(String description, Distance length, CourseUnit unit, double multiplier) {
+        this.description = description;
+        this.length = length;
+        this.unit = unit;
+        this.multiplier = multiplier;
+    }
+
+    public String getDescription() { return description; }
+
+    /** Returns the pool length as a Distance (exact, e.g., 25 yards or 25 meters). */
+    public Distance getLength() { return length; }
+
+    public CourseUnit getUnit() { return unit; }
+
+    /** Performance multiplier applied in pace calculations. */
+    public double multiplier() { return multiplier; }
+
+    @Override
+    public String toString() {
+        return description + " (" + length.toString() + ")" + " (multiplier=" + multiplier + ")";
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/enums/Effort.java
+package swimworkoutbuilder_javafx.model.enums;
+
+/**
+ * Effort levels are essential for creating goal-oriented structured workouts.
+ *
+ * v1: enum name + long description
+ * v2: added label and short description for UI
+ * v3: added paceMultiplier (scales seed /100) and restAllowanceSec (legacy interval hook)
+ *
+ * Notes in v4:
+ *  • paceMultiplier is still included for legacy/future experimentation, but DefaultPacePolicy
+ *    primarily drives rest/interval with distance × effort curves (restPercent).
+ *  • Rest allowance (seconds) is retained but currently unused in canonical policy; left as a hook.
+ */
+public enum Effort {
+    EASY(
+            "Easy",
+            "Warmup/cooldown, active recovery",
+            "Active recovery, technique focus, light pace, minimal exertion. Used between challenging sets or for warm-up/cool-down.",
+            1.55, 20
+    ),
+    ENDURANCE(
+            "Endurance",
+            "Aerobic, steady cruise pace",
+            "Aerobic steady, cruise pace, able to sustain for long durations (~10+ minutes) with little to moderate rest. Develops aerobic capacity.",
+            1.35, 15
+    ),
+    THRESHOLD(
+            "Threshold",
+            "Strong, controlled pace",
+            "Lactate threshold effort. Strong but controlled pace, just below race intensity. Can sustain repeats of 3–5 minutes with short rest.",
+            1.22, 10
+    ),
+    RACE_PACE(
+            "Race Pace",
+            "Target competition pace",
+            "Target competition pace. Swim at the exact speed of your goal event to develop pacing and race endurance. Effort is high, but repeatable.",
+            1.05, 30
+    ),
+    VO2_MAX(
+            "VO2 Max",
+            "Very intense, near max",
+            "High aerobic power effort. Very intense pace, near maximum oxygen uptake, sustainable for ~1–3 minutes. Builds maximum aerobic capacity.",
+            1.00, 40
+    ),
+    SPRINT(
+            "Sprint",
+            "All-out, maximal speed",
+            "All-out, maximal effort. Short bursts (≤25–50m) at top speed, long recovery required. Focus on power, explosiveness, and pure speed.",
+            0.95, 60
+    );
+
+    // v1: label and long description
+    private final String label;
+    private final String longDescription;
+
+    // v2: short description for UI
+    private final String shortDescription;
+
+    // v3: multipliers and rest allowance
+    private final double paceMultiplier;   // scales seed /100 for this effort
+    private final int restAllowanceSec;    // seconds added to goal for interval
+
+    Effort(String label, String shortDescription, String longDescription,
+           double paceMultiplier, int restAllowanceSec) {
+        this.label = label;
+        this.shortDescription = shortDescription;
+        this.longDescription = longDescription;
+        this.paceMultiplier = paceMultiplier;
+        this.restAllowanceSec = restAllowanceSec;
+    }
+
+    public String getLabel() { return label; }
+    public String getShortDescription() { return shortDescription; }
+    public String getLongDescription() { return longDescription; }
+
+    /**
+     * Legacy multiplier applied to seed pace per 100 for this effort level.
+     * In canonical math we still use this for initial tuning,
+     * but DefaultPacePolicy combines it with DistanceFactors and rest curves.
+     */
+    public double paceMultiplier() { return paceMultiplier; }
+
+    /** Legacy rest allowance (seconds). Not currently used in DefaultPacePolicy. */
+    public int restAllowanceSec() { return restAllowanceSec; }
+
+    @Override
+    public String toString() { return label; }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/enums/StrokeType.java
+package swimworkoutbuilder_javafx.model.enums;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Enumeration of supported swimming stroke types.
+ *
+ * <p>Each stroke has:</p>
+ * <ul>
+ *   <li>a canonical enum constant</li>
+ *   <li>a user-friendly full label</li>
+ *   <li>a short label (common shorthand for UI)</li>
+ *   <li>optional aliases for parsing input</li>
+ * </ul>
+ *
+ * <p>This allows flexible parsing of user input (e.g. "Free", "Fr",
+ * "Fly", or "IM") without losing the canonical form, while also giving
+ * you compact output in workouts.</p>
+ */
+public enum StrokeType {
+    FREESTYLE("Freestyle", "Free", new String[]{"Fr"}),
+    BACKSTROKE("Backstroke", "Back", new String[]{"Bk"}),
+    BREASTSTROKE("Breaststroke", "Breast", new String[]{"Br"}),
+    BUTTERFLY("Butterfly", "Fly", new String[]{}),
+    INDIVIDUAL_MEDLEY("Individual Medley", "IM", new String[]{}),
+    KICK("Kick", "Kick", new String[]{}),   // was FREE_KICK
+    DRILL("Drill", "Drill", new String[]{});
+
+    private final String label;
+    private final String shortLabel;
+    private final String[] aliases;
+
+    StrokeType(String label, String shortLabel, String[] aliases) {
+        this.label = label;
+        this.shortLabel = shortLabel;
+        this.aliases = aliases;
+    }
+
+    /** User-friendly label for UI or reports. */
+    public String getLabel() {
+        return label;
+    }
+
+    /** Short label for compact UI (tables, previews, etc.). */
+    public String getShortLabel() {
+        return shortLabel;
+    }
+
+    /** Aliases (shorthand names) for parsing input. */
+    public String[] getAliases() {
+        return aliases.clone();
+    }
+
+    @Override
+    public String toString() {
+        return label;
+    }
+
+    // --- Static parsing support ---
+
+    private static final Map<String, StrokeType> LOOKUP = new HashMap<>();
+
+    static {
+        for (StrokeType type : values()) {
+            LOOKUP.put(type.name().toUpperCase(), type);        // enum name
+            LOOKUP.put(type.label.toUpperCase(), type);         // full label
+            LOOKUP.put(type.shortLabel.toUpperCase(), type);    // short label
+            for (String alias : type.aliases) {
+                LOOKUP.put(alias.toUpperCase(), type);
+            }
+        }
+    }
+
+    /**
+     * Parse a string into a StrokeType, using enum names, labels, short labels, or aliases.
+     * @param text user input (e.g. "Free", "Fly", "IM")
+     * @return matching StrokeType, or null if none matched
+     */
+    public static StrokeType fromString(String text) {
+        if (text == null) return null;
+        return LOOKUP.get(text.trim().toUpperCase());
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/enums/CourseUnit.java
+package swimworkoutbuilder_javafx.model.enums;
+
+/**
+ * CourseUnit = Pool length unit of measure
+ */
+public enum CourseUnit {
+    YARDS,
+    METERS
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/utils/WorkoutPrinter.java
+package swimworkoutbuilder_javafx.model.utils;
+
+import swimworkoutbuilder_javafx.model.SetGroup;
+import swimworkoutbuilder_javafx.model.SwimSet;
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.model.enums.Course;
+import swimworkoutbuilder_javafx.model.pacing.PacePolicy;
+import swimworkoutbuilder_javafx.model.units.Distance;
+
+public final class WorkoutPrinter {
+    private WorkoutPrinter() {}
+
+    public static void printWorkout(Workout w, Swimmer swimmer, PacePolicy policy) {
+        boolean displayYards = (w.getCourse() == Course.SCY);
+        String unitLabel = displayYards ? "yd" : "m";
+
+        System.out.println("==================================================");
+        String swimmerName = (swimmer.getFirstName() + " " + swimmer.getLastName()).trim();
+        String shortId = swimmer.getId().toString().substring(0, 8);
+        System.out.printf("Swimmer: %s  (id=%s)%n", swimmerName, shortId);
+        System.out.printf("Workout: %s  [%s]%n", w.getName(), w.getCourse());
+        if (w.getNotes() != null && !w.getNotes().isBlank()) {
+            System.out.println("Notes:   " + w.getNotes());
+        }
+        System.out.println();
+
+        long workoutSwimSeconds = 0;
+        long workoutIntraRestSeconds = 0;
+        long workoutBetweenGroupRestSeconds = 0;
+        long workoutDisplayDistance = 0; // yards for SCY, meters otherwise
+
+        System.out.println("Groups (" + w.getGroups().size() + "):");
+        int groupIndex = 0;
+
+        for (SetGroup g : w.getGroups()) {
+            groupIndex++;
+            int groupReps = Math.max(1, g.getReps());
+
+            System.out.printf("  %d) %s", g.getOrder(), g.getName());
+            if (groupReps > 1) System.out.print("  x" + groupReps);
+            System.out.println();
+            if (g.getNotes() != null && !g.getNotes().isBlank()) {
+                System.out.println("     - " + g.getNotes());
+            }
+
+            long singlePassGroupSwimSec = 0;
+            long singlePassGroupIntraRestSec = 0;
+            long singlePassGroupDisplayDist = 0; // yards or meters per display rules
+
+            int idx = 1;
+            for (SwimSet s : g.getSets()) {
+                int reps = s.getReps();
+                Distance rep = s.getDistancePerRep();
+
+                // Per-rep display distance (snap to lap size for SCY display)
+                int repDisplayDist = displayYards
+                        ? snapToLapYards((int) Math.round(rep.toYards()))
+                        : (int) Math.round(rep.toMeters());
+
+                String strokeShort = (s.getStroke() == null) ? "" : s.getStroke().getShortLabel();
+
+                System.out.printf("     %d. %dx%d%s %-14s %-12s%n",
+                        idx++,
+                        reps,
+                        repDisplayDist, unitLabel,
+                        strokeShort,
+                        (s.getEffort() != null ? s.getEffort().getLabel() : "")
+                );
+
+                for (int r = 1; r <= reps; r++) {
+                    double goal  = policy.goalSeconds(w, s, swimmer, r);
+                    int interval = policy.intervalSeconds(w, s, swimmer, r);
+                    int rest     = policy.restSeconds(w, s, swimmer, r);
+
+                    singlePassGroupSwimSec      += Math.round(goal);
+                    singlePassGroupIntraRestSec += rest;
+
+                    System.out.printf("         #%d  goal %s | on %s | rest %s%n",
+                            r, mmss(goal), mmss(interval), mmss(rest));
+                }
+
+                if (s.getNotes() != null && !s.getNotes().isBlank()) {
+                    System.out.println("         note: " + s.getNotes());
+                }
+
+                // Add display distance for this set to the group display total
+                singlePassGroupDisplayDist += (long) reps * repDisplayDist;
+            }
+
+            long groupDisplayTotal = singlePassGroupDisplayDist * groupReps;
+            long groupSwimSecondsTotal = singlePassGroupSwimSec * groupReps;
+            long groupIntraRestTotal   = singlePassGroupIntraRestSec * groupReps;
+
+            workoutDisplayDistance      += groupDisplayTotal;
+            workoutSwimSeconds          += groupSwimSecondsTotal;
+            workoutIntraRestSeconds     += groupIntraRestTotal;
+
+            System.out.printf("     Group totals: distance=%d%s  swim=%s  rest=%s  total=%s%n",
+                    groupDisplayTotal, unitLabel,
+                    mmss(groupSwimSecondsTotal),
+                    mmss(groupIntraRestTotal),
+                    mmss(groupSwimSecondsTotal + groupIntraRestTotal));
+
+            // Between-group rest (use group's override if present, else workout default)
+            int restAfter = (g.getRestAfterGroupSec() > 0)
+                    ? g.getRestAfterGroupSec()
+                    : w.getDefaultRestBetweenGroupsSeconds();
+
+            if (groupIndex < w.getGroups().size() && restAfter > 0) {
+                workoutBetweenGroupRestSeconds += restAfter;
+                System.out.println("     (+" + mmss(restAfter) + " rest after group)");
+            }
+
+            System.out.println();
+        }
+
+        long workoutTotalSeconds = workoutSwimSeconds + workoutIntraRestSeconds + workoutBetweenGroupRestSeconds;
+
+        System.out.println("Totals:");
+        System.out.println("  swim time:          " + mmss(workoutSwimSeconds));
+        System.out.println("  intra-set rest:     " + mmss(workoutIntraRestSeconds));
+        System.out.println("  between-group rest: " + mmss(workoutBetweenGroupRestSeconds));
+        System.out.println("  ------------------------------------");
+        System.out.println("  workout total:      " + mmss(workoutTotalSeconds));
+        System.out.println("  total distance:     " + workoutDisplayDistance + " " + unitLabel);
+        System.out.println("==================================================");
+        System.out.println();
+    }
+
+    // snap yard counts to pool lap increments for SCY (25 yd)
+    private static int snapToLapYards(int yards) {
+        int lap = 25;
+        int laps = Math.round(yards / (float) lap);
+        return laps * lap;
+    }
+
+    private static String mmss(double seconds) {
+        long s = Math.max(0, Math.round(seconds));
+        return String.format("%d:%02d", s / 60, s % 60);
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/pacing/SeedPace.java
+package swimworkoutbuilder_javafx.model.pacing;
+
+import swimworkoutbuilder_javafx.model.units.Distance;
+import swimworkoutbuilder_javafx.model.units.TimeSpan;
+
+import java.util.Objects;
+
+/**
+ * Represents a swimmer’s **baseline pace** (seed time) for a specific stroke and distance.
+ *
+ * <p>A {@code SeedPace} defines how fast a swimmer can complete a known distance,
+ * serving as the foundation for all pace, goal, and interval calculations in the app.
+ * It captures both the measured distance and the time required, and derives the
+ * canonical swim speed in meters per second (m/s) for cross-course computations.</p>
+ *
+ * <h2>Responsibilities</h2>
+ * <ul>
+ *   <li>Store the original test distance as a {@link swimworkoutbuilder.model.units.Distance}.</li>
+ *   <li>Store the corresponding completion time as a {@link swimworkoutbuilder.model.units.TimeSpan}.</li>
+ *   <li>Derive and cache the swimmer’s canonical speed in meters per second.</li>
+ *   <li>Provide immutability, ensuring the seed pace cannot change once created.</li>
+ *   <li>Expose the timestamp of when the seed pace was last recorded or updated.</li>
+ * </ul>
+ *
+ * <h2>Canonical Design</h2>
+ * <p>All internal calculations use canonical (meter-based) units, ensuring consistency
+ * between yards and meters. For example, a 100-yard and 100-meter pace can both be
+ * compared and converted without floating-point drift.</p>
+ *
+ * <h2>Typical Usage</h2>
+ * <pre>{@code
+ * // Example: 100-yard freestyle in 78.0 seconds
+ * SeedPace seed = new SeedPace(Distance.ofYards(100), TimeSpan.ofSeconds(78.0));
+ * double speed = seed.speedMps(); // → 1.172 m/s
+ * }</pre>
+ *
+ * <h2>Integration</h2>
+ * <ul>
+ *   <li>Used by {@link swimworkoutbuilder.model.Swimmer} to maintain per-stroke seed paces.</li>
+ *   <li>Queried by {@link swimworkoutbuilder.model.pacing.DefaultPacePolicy} for goal and interval computation.</li>
+ *   <li>Supports extensions such as per-course adjustments or historical tracking.</li>
+ * </ul>
+ *
+ * @author Parker Blackwell
+ * @version MVP 1.0 (October 2025)
+ * @see swimworkoutbuilder.model.units.Distance
+ * @see swimworkoutbuilder.model.units.TimeSpan
+ * @see swimworkoutbuilder.model.Swimmer
+ */
+public final class SeedPace implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
+    private final Distance originalDistance;  // e.g., 100y or 100m
+    private final TimeSpan time;              // time for that distance
+    private final double speedMps;            // meters/second (0 if time==0)
+
+    /**
+     * Creates a new {@code SeedPace} from a measured distance and completion time.
+     *
+     * <p>This constructor immediately derives and caches the swimmer’s canonical
+     * speed in meters per second (m/s) based on the given distance and time.
+     * Both arguments must be non-null and the time must be greater than zero.</p>
+     *
+     * @param originalDistance the distance swum (e.g., 100 yards or 100 meters)
+     * @param time the total time taken to complete that distance
+     * @throws NullPointerException if either parameter is {@code null}
+     */
+    public SeedPace(Distance originalDistance, TimeSpan time) {
+        this.originalDistance = Objects.requireNonNull(originalDistance, "originalDistance");
+        this.time             = Objects.requireNonNull(time, "time");
+        long ms = this.time.toMillis();
+        this.speedMps = (ms <= 0L) ? 0.0 : (this.originalDistance.toMeters() / (ms / 1000.0));
+    }
+
+    /**
+     * Returns the original baseline distance (e.g., 100y or 100m) that this seed was measured over.
+     * This is used to normalize workout rep distances for pace calculations.
+     */
+    public Distance getOriginalDistance() { return originalDistance; }
+
+    /**
+     * Returns the total recorded time for the original seed distance.
+     * Stored as an immutable {@link TimeSpan} for precise millisecond access.
+     */
+    public TimeSpan getTime() { return time; }
+
+    /**
+     * Returns the swimmer’s baseline speed in meters per second, derived from the seed distance/time.
+     * A value of 0.0 indicates an invalid or zero-length time.
+     */
+    public double speedMps() { return speedMps; }
+
+    @Override
+    public String toString() {
+        return "SeedPace{" +
+                "originalDistance=" + originalDistance +
+                ", time=" + time +
+                ", speedMps=" + String.format("%.3f", speedMps) +
+                '}';
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/pacing/PacePolicy.java
+package swimworkoutbuilder_javafx.model.pacing;
+
+import swimworkoutbuilder_javafx.model.SwimSet;
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.Workout;
+
+/**
+ * Strategy interface for turning sets + seeds into concrete timing.
+ *
+ * Policies define how goal times, rests, and intervals are computed from:
+ *  • the workout context (course, modifiers),
+ *  • the swimmer's seed pace,
+ *  • and the set definition (stroke, reps, distance, effort, equipment).
+ */
+public interface PacePolicy {
+
+    /** Goal time (seconds) for a single rep (not the send-off). */
+    double goalSeconds(Workout workout, SwimSet set, Swimmer swimmer, int repIndex);
+
+    /**
+     * Interval/send-off (seconds) for a single rep.
+     * MVP rule: interval = round(goal) + rest.
+     */
+    int intervalSeconds(Workout workout, SwimSet set, Swimmer swimmer, int repIndex);
+
+    /** Rest after the rep (seconds). MVP rule: derived from Effort × distance ratio. */
+    int restSeconds(Workout workout, SwimSet set, Swimmer swimmer, int repIndex);
+
+    /**
+     * Optional short label for UI/printer (e.g., "rest :20").
+     * Implementations may format this however they wish.
+     */
+    String timingLabel(Workout workout, SwimSet set, Swimmer swimmer, int repIndex);
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/pacing/DefaultPacePolicy.java
+package swimworkoutbuilder_javafx.model.pacing;
+
+import swimworkoutbuilder_javafx.model.SwimSet;
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.model.enums.DistanceFactors;
+import swimworkoutbuilder_javafx.model.enums.Effort;
+import swimworkoutbuilder_javafx.model.enums.Equipment;
+import swimworkoutbuilder_javafx.model.enums.StrokeType;
+
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Multiplier-based MVP policy for computing goal, interval, and rest.
+ */
+public class DefaultPacePolicy implements PacePolicy {
+
+    private static final boolean DEBUG = false;
+
+    @Override
+    public double goalSeconds(Workout workout, SwimSet set, Swimmer swimmer, int repIndex) {
+        // Validate required references early to avoid NPEs in callers.
+        Objects.requireNonNull(workout, "workout");
+        Objects.requireNonNull(set, "set");
+        Objects.requireNonNull(swimmer, "swimmer");
+
+        // 1) Seed (canonical speed)
+        StrokeType stroke = set.getStroke();
+        SeedPace seed = swimmer.getSeedTime(stroke);
+        if (seed == null) throw new IllegalStateException("Missing seed for stroke: " + stroke);
+        double speedMps = seed.speedMps(); // canonical
+        if (speedMps <= 0.0) throw new IllegalStateException("Seed speed must be > 0 m/s for " + stroke);
+
+        // 2) Multipliers
+        Effort effort = set.getEffort();
+        double mEffort  = (effort == null) ? 1.0 : effort.paceMultiplier();
+        double mDist    = usesDistanceFactor(effort) ? DistanceFactors.forDistance(set.getDistancePerRep()) : 1.0;
+        double mCourse  = workout.getCourse().multiplier();
+        double mEquip   = equipmentProduct(set.getEquipment());
+        double mFatigue = 1.0; // hook for future
+
+        // 3) Distance in meters (canonical), compute goal
+        double repMeters = set.getDistancePerRep().toMeters();
+        double goal = (repMeters / speedMps) * mEffort * mDist * mCourse * mEquip * mFatigue;
+
+        if (DEBUG) {
+            System.out.printf(
+                    "[DEBUG] %s rep #%d goal: (%.2fm / %.4f m/s) × %.2f(effort) × %.2f(dist) × %.2f(course) × %.2f(equip) × %.2f(fatigue) = %.2fs%n",
+                    stroke, repIndex + 1,
+                    repMeters, speedMps, mEffort, mDist, mCourse, mEquip, mFatigue, goal
+            );
+        }
+        return goal;
+    }
+
+    @Override
+    public int restSeconds(Workout workout, SwimSet set, Swimmer swimmer, int repIndex) {
+        Objects.requireNonNull(workout, "workout");
+        Objects.requireNonNull(set, "set");
+        Objects.requireNonNull(swimmer, "swimmer");
+
+        int goalRounded = (int) Math.round(goalSeconds(workout, set, swimmer, repIndex));
+
+        SeedPace seed = swimmer.getSeedTime(set.getStroke());
+        if (seed == null) throw new IllegalStateException("Missing seed for " + set.getStroke());
+
+        double repMeters  = set.getDistancePerRep().toMeters();
+        double seedMeters = seed.getOriginalDistance().toMeters();
+
+        double r = distanceRatio(repMeters, seedMeters);
+        double pct = restPercent(set.getEffort(), r);
+
+        int rest = (int) Math.round(goalRounded * pct);
+
+        if (DEBUG) {
+            System.out.printf("[DEBUG-REST] r=%.2f (rep=%.2fm / seed=%.2fm), effort=%s, rest%%=%.1f%% -> rest=%ds%n",
+                    r, repMeters, seedMeters, set.getEffort(), pct * 100.0, rest);
+        }
+        return Math.max(0, rest);
+    }
+
+    @Override
+    public int intervalSeconds(Workout workout, SwimSet set, Swimmer swimmer, int repIndex) {
+        int goalRounded = (int) Math.round(goalSeconds(workout, set, swimmer, repIndex));
+        int rest = restSeconds(workout, set, swimmer, repIndex);
+        int interval = goalRounded + rest;
+        int rounded = roundToNearest5(interval);
+        if (DEBUG && rounded != interval) {
+            System.out.printf("[DEBUG-INT] interval %ds -> rounded to %ds%n", interval, rounded);
+        }
+        return rounded;
+    }
+
+    @Override
+    public String timingLabel(Workout workout, SwimSet set, Swimmer swimmer, int repIndex) {
+        int rest = restSeconds(workout, set, swimmer, repIndex);
+        return "rest: " + rest;
+    }
+
+    // --- helpers ---
+
+    private static boolean usesDistanceFactor(Effort e) {
+        if (e == null) return false;
+        switch (e) {
+            case THRESHOLD:
+            case RACE_PACE:
+            case VO2_MAX:
+            case SPRINT:
+                return true;
+            case EASY:
+            case ENDURANCE:
+            default:
+                return false;
+        }
+    }
+
+    private static double equipmentProduct(Set<Equipment> equipment) {
+        if (equipment == null || equipment.isEmpty()) return 1.0;
+        double m = 1.0;
+        for (Equipment eq : equipment) {
+            if (eq != null) m *= eq.multiplier();
+        }
+        return m;
+    }
+
+    /** Distance ratio r = rep / seedBase, clamped to avoid degenerate values. */
+    private static double distanceRatio(double repMeters, double seedMeters) {
+        double base = (seedMeters <= 0.0) ? 100.0 : seedMeters; // fallback: per-100m baseline
+        double r = repMeters / base;
+        return Math.max(0.1, r);
+    }
+
+    private static double lerp(double a, double b, double t) {
+        if (t <= 0) return a;
+        if (t >= 1) return b;
+        return a + (b - a) * t;
+    }
+
+    /** Round seconds to the nearest 5-second boundary (ties round up). */
+    private static int roundToNearest5(int secs) {
+        int rem = secs % 5;
+        if (rem < 0) rem += 5;
+        return (rem < 3) ? (secs - rem) : (secs + (5 - rem));
+    }
+
+    /**
+     * Rest percentage as a function of effort and distance ratio r.
+     */
+    private static double restPercent(Effort e, double r) {
+        if (e == null) return 0.06;
+
+        switch (e) {
+            case EASY: {
+                if (r <= 1.0) return 0.10;
+                if (r <= 4.0) return lerp(0.10, 0.18, (r - 1.0) / 3.0);
+                return lerp(0.18, 0.05, Math.min((r - 4.0) / 11.0, 1.0));
+            }
+            case ENDURANCE: {
+                if (r <= 1.0) return 0.04;
+                if (r <= 4.0) return lerp(0.04, 0.05, (r - 1.0) / 3.0);
+                return lerp(0.05, 0.045, Math.min((r - 4.0) / 11.0, 1.0));
+            }
+            case THRESHOLD: {
+                if (r <= 1.0) return 0.067;
+                if (r <= 4.0) return lerp(0.067, 0.055, (r - 1.0) / 3.0);
+                return lerp(0.055, 0.040, Math.min((r - 4.0) / 11.0, 1.0));
+            }
+            case RACE_PACE:
+            case VO2_MAX:
+            case SPRINT: {
+                if (r <= 1.0) return 0.70;
+                if (r <= 4.0) return lerp(0.70, 0.25, (r - 1.0) / 3.0);
+                return lerp(0.25, 0.05, Math.min((r - 4.0) / 11.0, 1.0));
+            }
+            default:
+                return 0.06;
+        }
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/units/Distance.java
+package swimworkoutbuilder_javafx.model.units;
+
+import java.math.BigDecimal;
+import java.util.Objects;
+
+/**
+ * Represents an immutable swimming distance with canonical storage in meters
+ * using fixed-point precision of 0.0001 meters (0.1 mm).
+ *
+ * <p>The {@code Distance} class uses a canonical internal representation:
+ * all distances are stored as integer counts of 1/10,000 of a meter,
+ * regardless of how they were originally entered or displayed.
+ * This design simplifies the model, ensures unit consistency, and prevents
+ * rounding drift when converting between yards and meters.</p>
+ *
+ * <p>Conversion follows the exact factor:
+ * <b>1 yard = 0.9144 meters</b>.
+ * By scaling values to 10,000 micro-meters per meter, arithmetic remains exact:
+ * <pre>{@code
+ * 25 yd × 9,144 microUnits = 228,600 microUnits = 22.86 m
+ * }</pre>
+ * This avoids floating-point precision loss and ensures that repeated
+ * conversions (yards ↔ meters) always produce stable, reversible results.</p>
+ *
+ * <p>All internal computations are performed in meters to maintain
+ * consistency across unit systems and guarantee deterministic results.</p>
+ *
+ * <h2>Responsibilities</h2>
+ * <ul>
+ *   <li>Encapsulates a scalar distance value stored in meters.</li>
+ *   <li>Provides factory methods for constructing instances from yards or meters
+ *       (e.g., {@link #ofYards(double)} and {@link #ofMeters(double)}).</li>
+ *   <li>Supports conversion methods between meters and yards, rounding to
+ *       common swimming course increments where appropriate.</li>
+ *   <li>Ensures immutability and value-based equality for safe use as a model
+ *       component or map key.</li>
+ * </ul>
+ *
+ * <h2>Design Notes</h2>
+ * <ul>
+ *   <li>Distances are canonicalized to meters internally. Conversions are performed only when needed.</li>
+ *   <li>The conversion ratio is based on 1 yard = 0.9144 meters, consistent with
+ *       official FINA and USA Swimming standards.</li>
+ *   <li>Instances are immutable and thread-safe.</li>
+ * </ul>
+ *
+ * <h2>Example Usage</h2>
+ * <pre>{@code
+ * Distance d1 = Distance.ofYards(100);   // create from yards
+ * Distance d2 = Distance.ofMeters(50);   // create from meters
+ *
+ * System.out.println(d1.toMeters());     // 91.44
+ * System.out.println(d2.toYards());      // 54.68
+ * }</pre>
+ *
+ * <h2>Typical Integration</h2>
+ * <p>
+ * {@code Distance} is used by {@link swimworkoutbuilder.model.SwimSet},
+ * {@link swimworkoutbuilder.model.pacing.SeedPace}, and
+ * {@link swimworkoutbuilder.model.pacing.DefaultPacePolicy}
+ * for computing goal times, intervals, and rest durations.
+ * </p>
+ *
+ * @author Parker Blackwell
+ * @version MVP 1.0 (October 2025)
+ * @see swimworkoutbuilder.model.units.TimeSpan
+ * @see swimworkoutbuilder.model.enums.Course
+ */
+public final class Distance implements Comparable<Distance>, java.io.Serializable {
+    private static final long serialVersionUID = 1L;
+
+    // Defines how the distance is expressed (YARDS or METERS). Independent of pool/course.
+    public enum Unit { METERS, YARDS }
+
+    private static final long MICROUNITS_PER_METER = 10_000L;
+    private static final long MICROUNITS_PER_YARD = 9_144L; // exact: 0.9144 m * 10_000
+
+    // canonical integer representation = mmeters x 10,0000 (prevent rounding errors)
+    private final long microUnits;
+
+    // User's preferred display unit (used only for UI or serialization).
+    private final Unit display;   // how the user entered / prefers to see it
+
+    // Private; called by ofMeters(), ofYards(), or ofCanonicalMicroUnits().
+    // Example:  Distance.ofYards(25) -> microUnits=228,600, display=YARDS
+    private Distance(long microUnits, Unit display) {
+        this.microUnits = microUnits;
+        this.display = Objects.requireNonNull(display, "display");
+    }
+
+    /** Factory: exact when meters has ≤4 decimals; otherwise rounds to nearest 0.1 mm. */
+    public static Distance ofMeters(double meters) {
+        long v = Math.round(meters * MICROUNITS_PER_METER);
+        return new Distance(v, Unit.METERS);
+        // If you need guaranteed no-double path, add a BigDecimal overload.
+    }
+
+    /** Factory: exact for any fractional/whole yards (because 1 yd = 9144 um4 exactly). */
+    public static Distance ofYards(double yards) {
+        long v = Math.round(yards * MICROUNITS_PER_YARD);
+        return new Distance(v, Unit.YARDS);
+    }
+
+    /** Exact factory (canonical). */
+    public static Distance ofCanonicalMicroUnits(long microUnits, Unit display) {
+        return new Distance(microUnits, display);
+    }
+
+    /** Canonical raw value (0.0001 m units). */
+    public long rawMicroUnits() { return microUnits; }
+
+    /** Preferred display unit. */
+    public Unit displayUnit() { return display; }
+
+    // --------- Conversions (use doubles for UI only; core math should use um4) ---------
+
+    public double toMeters() { return (double) microUnits / MICROUNITS_PER_METER; }
+
+    public double toYards()  { return (double) microUnits / MICROUNITS_PER_YARD;  }
+
+    /** Convert to a new Distance with the requested display unit (value unchanged). */
+    public Distance withDisplay(Unit unit) {
+        if (unit == this.display) return this;
+        return new Distance(this.microUnits, unit);
+    }
+
+    // --------- Arithmetic (exact in canonical space) ---------
+
+    public Distance plus(Distance other) {
+        return new Distance(Math.addExact(this.microUnits, other.microUnits), this.display);
+    }
+
+    public Distance minus(Distance other) {
+        return new Distance(Math.subtractExact(this.microUnits, other.microUnits), this.display);
+    }
+
+    public Distance times(int k) {
+        return new Distance(Math.multiplyExact(this.microUnits, k), this.display);
+    }
+
+    public Distance times(double factor) {
+        // Only use for policy multipliers; rounds to nearest 0.1 mm at the edge.
+        long v = Math.round(this.microUnits * factor);
+        return new Distance(v, this.display);
+    }
+
+    // --------- Comparisons / Equality ---------
+
+    // Enables sorting of distances (e.g., Collections.sort(listOfDistances)), do range checks, min/max
+    // Compares canonical microUnits so ordering is exact and unit agnostic.
+    @Override public int compareTo(Distance o) { return Long.compare(this.microUnits, o.microUnits); }
+
+
+    /** Defines value equality for this immutable value object. */
+    /** Two distances are equal if their canonical microUnits match. Ignores display unit -> 50m and 54.68 yd are equal.*/
+    @Override public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Distance)) return false;
+        Distance d = (Distance) o;
+        return microUnits == d.microUnits; // display unit is UI preference; equality is canonical
+    }
+
+    // Required due to overriding equals()
+    @Override public int hashCode() { return Long.hashCode(microUnits); }
+
+    // --------- Formatting helpers (UI/IO can use these) ---------
+
+    /** Meters as BigDecimal with 4 decimal places (exact). */
+    public BigDecimal metersAsBigDecimal() {
+        return BigDecimal.valueOf(microUnits, 4); // scale = 4 decimal places
+    }
+
+    /** Yards as BigDecimal (may be repeating; this is for display/rounding at edges). */
+    public BigDecimal yardsAsBigDecimal(int scale) {
+        return BigDecimal.valueOf(microUnits)
+                .divide(BigDecimal.valueOf(MICROUNITS_PER_YARD), scale, java.math.RoundingMode.HALF_UP);
+    }
+
+    @Override public String toString() {
+        return display == Unit.METERS
+                ? metersAsBigDecimal() + " m"
+                : yardsAsBigDecimal(2) + " yd";
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/units/TimeSpan.java
+package swimworkoutbuilder_javafx.model.units;
+
+/**
+ * Represents an immutable span of time stored in **milliseconds**.
+ *
+ * <p>{@code TimeSpan} is a lightweight utility class for expressing durations
+ * (e.g., 1:23.45) in a canonical, integer-based format. It provides
+ * arithmetic helpers, conversion utilities, and consistent string formatting
+ * for display in a human-readable form.</p>
+ *
+ * <h2>Design Notes</h2>
+ * <ul>
+ *   <li>Internally stores time as a {@code long} number of milliseconds for exact arithmetic.</li>
+ *   <li>Immutable — all operations return new {@code TimeSpan} instances.</li>
+ *   <li>Implements {@link Comparable} for natural ordering by duration.</li>
+ *   <li>Used in conjunction with {@link swimworkoutbuilder.model.units.Distance} and
+ *       {@link swimworkoutbuilder.model.pacing.SeedPace} for pacing calculations.</li>
+ * </ul>
+ *
+ * <h2>Typical Usage</h2>
+ * <pre>{@code
+ * TimeSpan t1 = TimeSpan.ofSeconds(78.3);         // 1:18.30
+ * TimeSpan t2 = TimeSpan.ofMinutesSecondsMillis(0, 25, 0); // 0:25.00
+ *
+ * TimeSpan total = t1.plus(t2);                   // 1:43.30
+ * System.out.println(total);                      // → "1:43.30"
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version MVP 1.0 (October 2025)
+ * @see swimworkoutbuilder.model.units.Distance
+ * @see swimworkoutbuilder.model.pacing.SeedPace
+ */
+public final class TimeSpan implements Comparable<TimeSpan>, java.io.Serializable {
+    private static final long serialVersionUID = 1L;
+
+    /** Duration in milliseconds (canonical internal storage). */
+    private final long millis;
+
+    /** Private constructor — use factory methods for clarity. */
+    private TimeSpan(long millis) { this.millis = millis; }
+
+    // ----------------------------------------------------------
+    // Factory methods
+    // ----------------------------------------------------------
+
+    /** Creates a {@code TimeSpan} from an exact millisecond value. */
+    public static TimeSpan ofMillis(long ms) { return new TimeSpan(ms); }
+
+    /** Creates a {@code TimeSpan} from a floating-point seconds value. */
+    public static TimeSpan ofSeconds(double seconds) {
+        return new TimeSpan(Math.round(seconds * 1000.0));
+    }
+
+    /**
+     * Creates a {@code TimeSpan} from minute, second, and millisecond components.
+     * @param minutes whole minutes
+     * @param seconds whole seconds
+     * @param millis  additional milliseconds
+     * @return new {@code TimeSpan} representing the combined duration
+     */
+    public static TimeSpan ofMinutesSecondsMillis(int minutes, int seconds, int millis) {
+        long total = Math.addExact(Math.addExact(minutes * 60_000L, seconds * 1_000L), millis);
+        return new TimeSpan(total);
+    }
+
+    // ----------------------------------------------------------
+    // Conversions
+    // ----------------------------------------------------------
+
+    /** Returns the total duration in milliseconds. */
+    public long toMillis() { return millis; }
+
+    /** Returns the total duration in seconds as a double. */
+    public double toSeconds() { return millis / 1000.0; }
+
+    // ----------------------------------------------------------
+    // Arithmetic
+    // ----------------------------------------------------------
+
+    /** Returns a new {@code TimeSpan} representing this + other. */
+    public TimeSpan plus(TimeSpan other) {
+        return new TimeSpan(Math.addExact(millis, other.millis));
+    }
+
+    /** Returns a new {@code TimeSpan} representing this − other. */
+    public TimeSpan minus(TimeSpan other) {
+        return new TimeSpan(Math.subtractExact(millis, other.millis));
+    }
+
+    /** Returns a scaled version of this time span (e.g., 1.5× longer). */
+    public TimeSpan times(double factor) {
+        return new TimeSpan(Math.round(millis * factor));
+    }
+
+    // ----------------------------------------------------------
+    // Comparison & equality
+    // ----------------------------------------------------------
+
+    @Override
+    public int compareTo(TimeSpan o) { return Long.compare(this.millis, o.millis); }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof TimeSpan)) return false;
+        return millis == ((TimeSpan) o).millis;
+    }
+
+    @Override
+    public int hashCode() { return Long.hashCode(millis); }
+
+    // ----------------------------------------------------------
+    // Formatting
+    // ----------------------------------------------------------
+
+    /**
+     * Returns a human-readable formatted string, e.g., {@code "1:23.45"}.
+     * <p>Displays minutes, seconds, and hundredths of a second.</p>
+     */
+    @Override
+    public String toString() {
+        long total = millis;
+        long minutes = total / 60_000; total %= 60_000;
+        long seconds = total / 1_000;  total %= 1_000;
+        long hundredths = Math.round(total / 10.0);
+
+        // Normalize edge cases (e.g., 59.99 rounds up cleanly)
+        if (hundredths == 100) { hundredths = 0; seconds++; }
+        if (seconds == 60) { seconds = 0; minutes++; }
+
+        return String.format("%d:%02d.%02d", minutes, seconds, hundredths);
+    }
+}
+FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./model/SetGroup.java
+package swimworkoutbuilder_javafx.model;
+
+import swimworkoutbuilder_javafx.model.enums.StrokeType;
+import swimworkoutbuilder_javafx.model.units.Distance;
+import swimworkoutbuilder_javafx.model.units.TimeSpan;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * A logical collection of SwimSets that may repeat.
+ * Supports rest between sets (inside the group) and rest between group repeats.
+ */
+public class SetGroup implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    private String name;
+    private int order = 0;
+    private int reps = 1;
+    private String notes;
+
+    /** New: rest between sets within the group (seconds, >=0) */
+    private int restBetweenSetsSec = 0;
+
+    /** Already existed: rest between group repetitions (seconds, >=0) */
+    private int restAfterGroupSec = 0;
+
+    private final List<SwimSet> sets = new ArrayList<>();
+
+    public SetGroup() {}
+
+    public SetGroup(String name) {
+        this.name = name;
+    }
+
+    // --- Getters/Setters ---
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public int getOrder() { return order; }
+    public void setOrder(int order) { this.order = order; }
+
+    public int getReps() { return reps; }
+    public void setReps(int reps) { this.reps = Math.max(1, reps); }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+
+    public int getRestBetweenSetsSec() { return Math.max(0, restBetweenSetsSec); }
+    public void setRestBetweenSetsSec(int restBetweenSetsSec) { this.restBetweenSetsSec = Math.max(0, restBetweenSetsSec); }
+
+    public int getRestAfterGroupSec() { return Math.max(0, restAfterGroupSec); }
+    public void setRestAfterGroupSec(int restAfterGroupSec) { this.restAfterGroupSec = Math.max(0, restAfterGroupSec); }
+
+    public List<SwimSet> getSets() { return sets; }
+    public void addSet(SwimSet s) { if (s != null) sets.add(s); }
+
+    @Override
+    public String toString() {
+        return "SetGroup{" +
+                "name='" + name + '\'' +
+                ", order=" + order +
+                ", reps=" + reps +
+                ", restBetweenSetsSec=" + restBetweenSetsSec +
+                ", restAfterGroupSec=" + restAfterGroupSec +
+                ", notes='" + notes + '\'' +
+                ", sets=" + sets.size() +
+                '}';
+    }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./store/LocalStore.java
+package swimworkoutbuilder_javafx.store;
+
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.Workout;
+
+import java.io.*;
+import java.nio.file.Files;
+import java.util.*;
+
+public final class LocalStore {
+    private LocalStore() {}
+
+    // --- Directories & app file ---
+    public static File baseDir() {
+        String home = System.getProperty("user.home");
+        File dir = new File(home, "Documents/SwimWorkoutBuilder");
+        if (!dir.exists()) dir.mkdirs();
+        return dir;
+    }
+    public static File swimmersDir() { return ensure(new File(baseDir(), "swimmers")); }
+    public static File workoutsDir() { return ensure(new File(baseDir(), "workouts")); }
+    public static File appFile()     { return new File(baseDir(), "app.properties"); }
+    private static File ensure(File f) { if (!f.exists()) f.mkdirs(); return f; }
+
+    // --- Swimmers ---
+    public static void saveSwimmer(Swimmer s) throws IOException {
+        File f = new File(swimmersDir(), s.getId().toString() + ".bin");
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(f))) {
+            oos.writeObject(s);
+        }
+    }
+
+    public static Swimmer loadSwimmer(UUID id) throws IOException, ClassNotFoundException {
+        File f = new File(swimmersDir(), id.toString() + ".bin");
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
+            return (Swimmer) ois.readObject();
+        }
+    }
+
+    public static List<Swimmer> listSwimmers() {
+        File[] files = swimmersDir().listFiles((d, n) -> n.endsWith(".bin"));
+        if (files == null) return List.of();
+        List<Swimmer> out = new ArrayList<>();
+        for (File f : files) {
+            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
+                out.add((Swimmer) ois.readObject());
+            } catch (Exception ignored) {}
+        }
+        out.sort(Comparator.comparing(Swimmer::getLastName, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(Swimmer::getFirstName, String.CASE_INSENSITIVE_ORDER));
+        return out;
+    }
+
+    // --- Workouts ---
+    public static void saveWorkout(Workout w) throws IOException {
+        File f = new File(workoutsDir(), w.getId().toString() + ".bin");
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(f))) {
+            oos.writeObject(w);
+        }
+    }
+
+    public static Workout loadWorkout(UUID id) throws IOException, ClassNotFoundException {
+        File f = new File(workoutsDir(), id.toString() + ".bin");
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
+            return (Workout) ois.readObject();
+        }
+    }
+
+    public static List<Workout> listWorkoutsFor(UUID swimmerId) {
+        File[] files = workoutsDir().listFiles((d, n) -> n.endsWith(".bin"));
+        if (files == null) return List.of();
+        List<Workout> out = new ArrayList<>();
+        for (File f : files) {
+            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
+                Workout w = (Workout) ois.readObject();
+                if (Objects.equals(w.getSwimmerId(), swimmerId)) out.add(w);
+            } catch (Exception ignored) {}
+        }
+        out.sort(Comparator.comparing(Workout::getName, String.CASE_INSENSITIVE_ORDER));
+        return out;
+    }
+
+    // --- Remember last open ---
+    public static void saveLast(UUID swimmerId, UUID workoutId) {
+        Properties p = new Properties();
+        if (swimmerId != null) p.setProperty("last.swimmer", swimmerId.toString());
+        if (workoutId != null) p.setProperty("last.workout", workoutId.toString());
+        try (OutputStream os = Files.newOutputStream(appFile().toPath())) {
+            p.store(os, "SwimWorkoutBuilder app");
+        } catch (IOException ignored) {}
+    }
+
+    public static Optional<UUID> lastSwimmer() {
+        Properties p = new Properties();
+        try (InputStream is = Files.newInputStream(appFile().toPath())) {
+            p.load(is);
+        } catch (IOException ignored) {}
+        String s = p.getProperty("last.swimmer");
+        try { return (s==null)?Optional.empty():Optional.of(UUID.fromString(s)); }
+        catch (Exception e) { return Optional.empty(); }
+    }
+
+    public static Optional<UUID> lastWorkout() {
+        Properties p = new Properties();
+        try (InputStream is = Files.newInputStream(appFile().toPath())) {
+            p.load(is);
+        } catch (IOException ignored) {}
+        String s = p.getProperty("last.workout");
+        try { return (s==null)?Optional.empty():Optional.of(UUID.fromString(s)); }
+        catch (Exception e) { return Optional.empty(); }
+    }
+
+    // --- Deletes (used by UI) ---
+    /** Delete swimmer file, clear "last" if needed, and delete all of their workouts. */
+    public static boolean deleteSwimmer(UUID swimmerId) {
+        File f = new File(swimmersDir(), swimmerId.toString() + ".bin");
+        boolean ok = !f.exists() || f.delete();
+
+        // Clear "last" if it matched this swimmer
+        var lastS = lastSwimmer();
+        if (lastS.isPresent() && lastS.get().equals(swimmerId)) {
+            saveLast(null, null);
+        }
+        // Delete all workouts for this swimmer
+        deleteWorkoutsFor(swimmerId);
+        return ok;
+    }
+
+    /** Delete all workouts associated with a swimmer. Returns number deleted. */
+    public static int deleteWorkoutsFor(UUID swimmerId) {
+        File[] files = workoutsDir().listFiles((d, name) -> name.endsWith(".bin"));
+        int count = 0;
+        if (files == null) return 0;
+        for (File f : files) {
+            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
+                Workout w = (Workout) ois.readObject();
+                if (Objects.equals(w.getSwimmerId(), swimmerId)) {
+                    if (f.delete()) count++;
+                }
+            } catch (Exception ignored) {}
+        }
+        return count;
+    }
+}FILE: /Users/parkerblackwell/Documents/IntelliJProjects/SwimWorkoutBuilder_JavaFX/src/swimworkoutbuilder_javafx/./store/FilesUtil.java
+package swimworkoutbuilder_javafx.store;
+
+import java.io.File;
+
+public class FilesUtil {
+    private FilesUtil() {}
+
+    public static File baseDir() {
+        String home = System.getProperty("user.home");
+        File dir = new File(home, "Documents/SwimWorkoutBuilder");
+        if(!dir.exists()) {
+            dir.mkdirs();
+        }
+        return dir;
+    }
+    public static File swimmersDir() { return ensure(new File(baseDir(), "swimmers")); }
+    public static File workoutsDir() { return ensure(new File(baseDir(), "workouts")); }
+    public static File appFile() { return new File(baseDir(), "app.properties"); }
+
+    private static File ensure(File f) {
+        if(!f.exists()) f.mkdirs();
+        return f;
+    }
+}
