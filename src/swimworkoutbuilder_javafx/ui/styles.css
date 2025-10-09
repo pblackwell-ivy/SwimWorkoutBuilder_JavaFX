@@ -14,6 +14,12 @@
     -fx-padding: 0 0 10px 0; /* Add bottom padding */
 }
 
+.section-title {
+    -fx-font-size: 16pt; /* Slightly larger for section titles */
+    -fx-font-weight: bold; /* Make it stand out */
+    -fx-padding: 10px 0 5px 0; /* Add top padding */
+}
+
 /* 3. Clean up the Grid/Data Entry */
 .grid-pane {
     /* Crucial: Remove the visible grid lines */
@@ -31,8 +37,11 @@
 /* Make the column headers bold and larger */
 .label-column-header {
     -fx-font-weight: bold; /* Make the text bold */
-    -fx-font-size: 14pt;   /* Slightly larger than the standard 14.0 font */
+    -fx-font-size: 10pt;   /* Slightly larger than the standard 14.0 font */
     -fx-text-fill: #000000; /* Ensure the color is clearly black */
+}
+.seed-time-input {
+    -fx-alignment: CENTER;
 }
 
 /* 4. Modernize TextFields */
