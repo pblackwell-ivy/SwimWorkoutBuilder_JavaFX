@@ -22,6 +22,7 @@ import swimworkoutbuilder_javafx.ui.dialogs.SwimmerFormDialog;
 import swimworkoutbuilder_javafx.ui.dialogs.WorkoutFormDialog;
 import swimworkoutbuilder_javafx.ui.seeds.SeedGridPane;
 import swimworkoutbuilder_javafx.ui.shell.ActionBar;
+import swimworkoutbuilder_javafx.ui.preview.PreviewPane;
 
 import java.util.List;
 import java.util.Objects;
@@ -191,6 +192,11 @@ public class MainView extends BorderPane {
         seedPane.setPadding(new Insets(8));
         seedPane.setPrefWidth(320);
         setRight(seedPane);
+        // --- add the preview at the bottom ---
+        PreviewPane previewPane = new PreviewPane();
+        previewPane.setPadding(new Insets(6));
+        previewPane.setPrefHeight(220);
+        setBottom(previewPane);
     }
 
     // ======= Tree building & formatting =======
