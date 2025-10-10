@@ -1,65 +1,53 @@
 package swimworkoutbuilder_javafx.state;
 
-import javafx.beans.property.*;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.model.Workout;
 
-/**
- * Single source of truth for UI state.
- * Exposes observable properties so views/presenters can bind without caring
- * where widgets are placed on screen.
- *
- * Backward compatibility:
- * - currentSwimmer/Workout + activeSwimmer/Workout aliases
- */
-public final class AppState {
+import java.io.Serializable;
 
-    // Primary (preferred) names
+public final class AppState implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    // Singleton
+    private static final AppState INSTANCE = new AppState();
+    private AppState() {}
+    /** Preferred accessor used throughout the UI. */
+    public static AppState get() { return INSTANCE; }
+    /** Kept for any legacy callers. */
+    public static AppState getInstance() { return INSTANCE; }
+
+    // Observable state
+    private final ObjectProperty<ObservableList<Swimmer>> swimmers =
+            new SimpleObjectProperty<>(FXCollections.observableArrayList());
     private final ObjectProperty<Swimmer> currentSwimmer = new SimpleObjectProperty<>();
     private final ObjectProperty<Workout> currentWorkout = new SimpleObjectProperty<>();
 
-    private final ListProperty<Swimmer> swimmers =
-            new SimpleListProperty<>(FXCollections.observableArrayList());
-
-    private final ListProperty<Workout> recentWorkouts =
-            new SimpleListProperty<>(FXCollections.observableArrayList());
-
-    // ---- Current swimmer ----
-    public ObjectProperty<Swimmer> currentSwimmerProperty() { return currentSwimmer; }
-    public Swimmer getCurrentSwimmer() { return currentSwimmer.get(); }
-    public void setCurrentSwimmer(Swimmer s) { currentSwimmer.set(s); }
-
-    // ---- Current workout ----
-    public ObjectProperty<Workout> currentWorkoutProperty() { return currentWorkout; }
-    public Workout getCurrentWorkout() { return currentWorkout.get(); }
-    public void setCurrentWorkout(Workout w) { currentWorkout.set(w); }
-
-    // ---- Swimmers list (observable) ----
-    public ListProperty<Swimmer> swimmersProperty() { return swimmers; }
+    // Swimmers list (the ComboBox binds to this)
     public ObservableList<Swimmer> getSwimmers() { return swimmers.get(); }
-    public void setSwimmers(ObservableList<Swimmer> list) { this.swimmers.set(list); }
+    public void setSwimmers(ObservableList<Swimmer> value) { swimmers.set(value); }
+    public ObjectProperty<ObservableList<Swimmer>> swimmersProperty() { return swimmers; }
 
-    // ---- Recent workouts (optional) ----
-    public ListProperty<Workout> recentWorkoutsProperty() { return recentWorkouts; }
-    public ObservableList<Workout> getRecentWorkouts() { return recentWorkouts.get(); }
-    public void setRecentWorkouts(ObservableList<Workout> list) { this.recentWorkouts.set(list); }
+    // Current swimmer
+    public Swimmer getCurrentSwimmer() { return currentSwimmer.get(); }
+    public void setCurrentSwimmer(Swimmer value) { currentSwimmer.set(value); }
+    public ObjectProperty<Swimmer> currentSwimmerProperty() { return currentSwimmer; }
 
-    // -------- Aliases for older call sites (safe to keep) --------
-    public ObjectProperty<Swimmer> activeSwimmerProperty() { return currentSwimmer; }
-    public Swimmer getActiveSwimmer() { return getCurrentSwimmer(); }
-    public void setActiveSwimmer(Swimmer s) { setCurrentSwimmer(s); }
+    // Current workout
+    public Workout getCurrentWorkout() { return currentWorkout.get(); }
+    public void setCurrentWorkout(Workout value) { currentWorkout.set(value); }
+    public ObjectProperty<Workout> currentWorkoutProperty() { return currentWorkout; }
 
-    public ObjectProperty<Workout> activeWorkoutProperty() { return currentWorkout; }
-    public Workout getActiveWorkout() { return getCurrentWorkout(); }
-    public void setActiveWorkout(Workout w) { setCurrentWorkout(w); }
+    // Convenience
+    public void clear() { currentSwimmer.set(null); currentWorkout.set(null); }
 
-    // ---------------------------------------------------------------------
-// TEMPORARY SINGLETON ACCESSOR for legacy UI classes.
-// TODO: remove once all views use constructor-injected AppState
-// ---------------------------------------------------------------------
-    private static final AppState INSTANCE = new AppState();
-
-    public static AppState get() { return INSTANCE; }
+    @Override public String toString() {
+        return "AppState{swimmers=" + (getSwimmers()==null?0:getSwimmers().size()) +
+                ", currentSwimmer=" + (getCurrentSwimmer()==null?"none":getCurrentSwimmer().getId()) +
+                ", currentWorkout=" + (getCurrentWorkout()==null?"none":getCurrentWorkout().getId()) +
+                '}';
+    }
 }

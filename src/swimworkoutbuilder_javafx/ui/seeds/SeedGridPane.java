@@ -133,7 +133,7 @@ public final class SeedGridPane extends BorderPane {
         tf.setPrefColumnCount(6);
         tf.setMaxWidth(60);
         tf.textProperty().addListener((o, a, b) -> {
-            if (presenter.editingProperty().get()) presenter.markDirty();
+            if (presenter.editingProperty().getValue()) presenter.markDirty();
         });
 
 
@@ -178,7 +178,7 @@ public final class SeedGridPane extends BorderPane {
 
     private void wireState() {
         btnEdit.setOnAction(e -> {
-            if (!hasSwimmer.get()) return;
+            if (!hasSwimmer.getValue()) return;
             presenter.beginEdit();
             setEditable(true);
         });
@@ -190,7 +190,7 @@ public final class SeedGridPane extends BorderPane {
         });
 
         btnSave.setOnAction(e -> {
-            if (!hasSwimmer.get()) return;
+            if (!hasSwimmer.getValue()) return;
             if (!saveIntoSwimmer(boundSwimmer)) return;
             try { LocalStore.saveSwimmer(boundSwimmer); } catch (Exception ignored) {}
             presenter.save();
