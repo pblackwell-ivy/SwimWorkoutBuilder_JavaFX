@@ -55,16 +55,16 @@ import java.util.Objects;
  *
  * <h2>Typical Integration</h2>
  * <p>
- * {@code Distance} is used by {@link swimworkoutbuilder.model.SwimSet},
- * {@link swimworkoutbuilder.model.pacing.SeedPace}, and
- * {@link swimworkoutbuilder.model.pacing.DefaultPacePolicy}
+ * {@code Distance} is used by {@link swimworkoutbuilder_javafx.model.SwimSet},
+ * {@link swimworkoutbuilder_javafx.model.pacing.SeedPace}, and
+ * {@link swimworkoutbuilder_javafx.model.pacing.DefaultPacePolicy}
  * for computing goal times, intervals, and rest durations.
  * </p>
  *
  * @author Parker Blackwell
  * @version MVP 1.0 (October 2025)
- * @see swimworkoutbuilder.model.units.TimeSpan
- * @see swimworkoutbuilder.model.enums.Course
+ * @see swimworkoutbuilder_javafx.model.units.TimeSpan
+ * @see swimworkoutbuilder_javafx.model.enums.Course
  */
 public final class Distance implements Comparable<Distance>, java.io.Serializable {
     private static final long serialVersionUID = 1L;
