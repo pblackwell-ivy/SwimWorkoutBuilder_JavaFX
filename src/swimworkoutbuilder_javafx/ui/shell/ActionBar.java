@@ -52,7 +52,17 @@ public class ActionBar {
                 return;
             }
             var w = LoadWorkoutDialog.show(cur.getId());
-            if (w != null) AppState.get().setCurrentWorkout(w);
+            if (w != null) {
+                try {
+                    // Make the selection consistent with the workout's owner
+                    var owner = LocalStore.loadSwimmer(w.getSwimmerId());
+                    if (!AppState.get().getSwimmers().contains(owner)) {
+                        AppState.get().getSwimmers().add(owner);
+                    }
+                    AppState.get().setCurrentSwimmer(owner);
+                } catch (Exception ignored) {}
+                AppState.get().setCurrentWorkout(w);
+            }
         });
 
         btnPrint.setOnAction(e ->

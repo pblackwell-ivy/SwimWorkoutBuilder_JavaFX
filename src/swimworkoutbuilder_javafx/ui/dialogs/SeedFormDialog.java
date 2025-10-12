@@ -55,7 +55,7 @@ public class SeedFormDialog {
         colStroke.setPrefWidth(110);
         colDistance.setPrefWidth(90);
         colPace.setPrefWidth(100);
-        table.getColumns().addAll(colStroke, colDistance, colPace);
+        table.getColumns().addAll(java.util.List.of(colStroke, colDistance, colPace));
 
         final Map<StrokeType, SeedPace> working = new EnumMap<>(StrokeType.class);
         if (swimmer != null && swimmer.getSeedPaces() != null) {
