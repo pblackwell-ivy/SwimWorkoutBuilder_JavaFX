@@ -1,156 +1,212 @@
 package swimworkoutbuilder_javafx.ui.swimmers;
 
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.Parent;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
+import javafx.scene.Node;
+import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.*;
+import javafx.util.StringConverter;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.state.AppState;
+import swimworkoutbuilder_javafx.store.LocalStore;
 
-import java.time.format.DateTimeFormatter;
-
-/**
- * Compact swimmer selector + read-only details block for the left pane.
- *
- * <p>Responsibilities:
- * <ul>
- *   <li>Show a ComboBox of swimmers from AppState</li>
- *   <li>Reflect selected swimmer’s basic details (name, team, created/updated)</li>
- *   <li>Expose local Edit/Delete buttons (no behavior wired yet)</li>
- * </ul>
- *
- * <p>Design notes:
- * <ul>
- *   <li>Pure view: no repo access; reads/writes AppState only</li>
- *   <li>Minimal layout to keep vertical footprint small</li>
- * </ul>
- */
 public final class SwimmerSection {
 
     private final VBox root = new VBox(8);
 
     private final ComboBox<Swimmer> cbSwimmer = new ComboBox<>();
+    private final Button btnAddSwimmer = makeIconButton("plus", "Add swimmer", this::onAddSwimmer);
+    private final Button btnEdit       = makeIconButton("pencil", "Edit swimmer", () ->
+            new Alert(Alert.AlertType.INFORMATION, "Edit Swimmer (coming soon)").showAndWait()
+    );
+    private final Button btnDelete     = makeIconButton("trash", "Delete swimmer", () ->
+            new Alert(Alert.AlertType.INFORMATION, "Delete Swimmer (coming soon)").showAndWait()
+    );
 
-    private final Label lblFullName    = new Label("-");
-    private final Label lblPreferred   = new Label("-");
-    private final Label lblTeam        = new Label("-");
-    private final Label lblCreated     = new Label("-");
-    private final Label lblUpdated     = new Label("-");
+    private final Label lblName = new Label();
+    private final Label lblPreferred = new Label();
+    private final Label lblTeam = new Label();
+    private final Label lblCreated = new Label();
+    private final Label lblUpdated = new Label();
 
-    // Local actions (intentionally not wired yet; presenter will attach later)
-    private final Button btnEdit   = new Button("Edit");
-    private final Button btnDelete = new Button("Delete");
+    public SwimmerSection() {
+        buildUI();
+        wireState();
+    }
 
-    private final AppState app;
+    public Node node() { return root; }
 
-    private static final DateTimeFormatter TS =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                    .withZone(java.time.ZoneId.systemDefault());
+    // ---------------- UI ----------------
 
-    public SwimmerSection(AppState app) {
-        this.app = app;
+    private void buildUI() {
+        root.setPadding(new Insets(6, 10, 6, 10));
 
-        // ----- Top row: selector + local actions (Edit/Delete) -----
-        var actions = new HBox(6, btnEdit, btnDelete);
-        var spacer  = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        var selectorRow = new HBox(8, new Label("Swimmer:"), cbSwimmer, spacer, actions);
-        selectorRow.setAlignment(Pos.CENTER_LEFT);
-
-        // Keep combo width reasonable but compact
-        cbSwimmer.setPrefWidth(220);
-
-        // ----- Details block (read-only) -----
-        var details = new VBox(3,
-                row("Name:",        lblFullName),
-                row("Preferred:",   lblPreferred),
-                row("Team:",        lblTeam),
-                row("Created:",     lblCreated),
-                row("Updated:",     lblUpdated)
-        );
-        details.getStyleClass().add("swimmer-details");
-
-        root.getChildren().addAll(selectorRow, details);
-        root.setPadding(new Insets(8, 8, 12, 8));
-
-        // ----- Bindings to AppState -----
-
-        // Populate list from AppState.swimmers
-        cbSwimmer.setItems(app.getSwimmers());
-        // If the list object in AppState is replaced, keep ComboBox in sync
-        app.swimmersProperty().addListener((obs, oldList, newList) -> cbSwimmer.setItems(newList));
-
-        // Write selection -> AppState.currentSwimmer
-        cbSwimmer.getSelectionModel().selectedItemProperty().addListener((o, old, sel) -> {
-            if (sel != app.getCurrentSwimmer()) {
-                app.setCurrentSwimmer(sel);
+        // Combo label formatting
+        cbSwimmer.setConverter(new StringConverter<>() {
+            @Override public String toString(Swimmer s) { return displayName(s); }
+            @Override public Swimmer fromString(String string) { return null; }
+        });
+        cbSwimmer.setCellFactory(list -> new ListCell<>() {
+            @Override protected void updateItem(Swimmer s, boolean empty) {
+                super.updateItem(s, empty);
+                setText(empty || s == null ? null : displayName(s));
+            }
+        });
+        cbSwimmer.setButtonCell(new ListCell<>() {
+            @Override protected void updateItem(Swimmer s, boolean empty) {
+                super.updateItem(s, empty);
+                setText(empty || s == null ? null : displayName(s));
             }
         });
 
-        // Read AppState.currentSwimmer -> selection + details
-        app.currentSwimmerProperty().addListener((o, old, sel) -> {
-            if (cbSwimmer.getValue() != sel) cbSwimmer.setValue(sel);
-            renderDetails(sel);
+        // Toolbar row
+        HBox top = new HBox(8, new Label("Swimmer:"), cbSwimmer, btnAddSwimmer, btnEdit, btnDelete);
+        HBox.setHgrow(cbSwimmer, Priority.ALWAYS);
+
+        GridPane info = new GridPane();
+        info.setHgap(8);
+        info.setVgap(4);
+        int r = 0;
+        info.addRow(r++, new Label("Name:"), lblName);
+        info.addRow(r++, new Label("Preferred:"), lblPreferred);
+        info.addRow(r++, new Label("Team:"), lblTeam);
+        info.addRow(r++, new Label("Created:"), lblCreated);
+        info.addRow(r,   new Label("Updated:"), lblUpdated);
+
+        root.getChildren().addAll(top, info);
+
+        // initial disabled until swimmer selected
+        btnEdit.setDisable(true);
+        btnDelete.setDisable(true);
+    }
+
+    // ---------------- State wiring ----------------
+
+    private void wireState() {
+        var app = AppState.get();
+
+        cbSwimmer.setItems(app.getSwimmers());
+
+        // two-way sync
+        cbSwimmer.getSelectionModel().selectedItemProperty().addListener((o, oldV, s) -> {
+            if (s != null && s != app.getCurrentSwimmer()) app.setCurrentSwimmer(s);
+        });
+        app.currentSwimmerProperty().addListener((o, oldV, s) -> {
+            if (s != cbSwimmer.getValue()) cbSwimmer.setValue(s);
+            refreshDetails(s);
         });
 
-        // Initial render
+        // initial selection
         if (app.getCurrentSwimmer() != null) {
             cbSwimmer.setValue(app.getCurrentSwimmer());
+            refreshDetails(app.getCurrentSwimmer());
         } else if (!app.getSwimmers().isEmpty()) {
-            cbSwimmer.setValue(app.getSwimmers().get(0));
+            cbSwimmer.getSelectionModel().selectFirst();
         }
-        renderDetails(cbSwimmer.getValue());
 
-        // Buttons disabled when nothing selected
+        // keep Edit/Delete disabled with no selection
         btnEdit.disableProperty().bind(cbSwimmer.valueProperty().isNull());
         btnDelete.disableProperty().bind(cbSwimmer.valueProperty().isNull());
     }
 
-    private static HBox row(String label, Label value) {
-        var l = new Label(label);
-        l.getStyleClass().add("muted");
-        var box = new HBox(6, l, value);
-        box.setAlignment(Pos.CENTER_LEFT);
-        return box;
+    // ---------------- Actions ----------------
+
+    private void onAddSwimmer() {
+        Dialog<Swimmer> dlg = new Dialog<>();
+        dlg.setTitle("New Swimmer");
+        dlg.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, ButtonType.OK);
+
+        TextField tfFirst = new TextField();
+        TextField tfLast  = new TextField();
+        TextField tfPref  = new TextField();
+        TextField tfTeam  = new TextField();
+
+        GridPane gp = new GridPane();
+        gp.setHgap(8); gp.setVgap(8); gp.setPadding(new Insets(10));
+        gp.addRow(0, new Label("First:"), tfFirst);
+        gp.addRow(1, new Label("Last:"),  tfLast);
+        gp.addRow(2, new Label("Preferred:"), tfPref);
+        gp.addRow(3, new Label("Team:"), tfTeam);
+        dlg.getDialogPane().setContent(gp);
+
+        Node ok = dlg.getDialogPane().lookupButton(ButtonType.OK);
+        ok.setDisable(true);
+        tfFirst.textProperty().addListener((o,a,b)-> ok.setDisable(b.trim().isEmpty()));
+        tfLast.textProperty().addListener((o,a,b)-> ok.setDisable(tfFirst.getText().trim().isEmpty() || b.trim().isEmpty()));
+
+        dlg.setResultConverter(bt -> {
+            if (bt != ButtonType.OK) return null;
+            return new Swimmer(
+                    java.util.UUID.randomUUID(),
+                    tfFirst.getText().trim(),
+                    tfLast.getText().trim(),
+                    tfPref.getText().trim(),
+                    tfTeam.getText().trim(),
+                    java.time.Instant.now(),
+                    java.time.Instant.now()
+            );
+        });
+
+        Swimmer created = dlg.showAndWait().orElse(null);
+        if (created == null) return;
+
+        try { LocalStore.saveSwimmer(created); } catch (Exception ignored) {}
+        var app = AppState.get();
+        app.getSwimmers().add(created);
+        app.setCurrentSwimmer(created);
     }
 
-    private void renderDetails(Swimmer s) {
-        if (s == null) {
-            lblFullName.setText("-");
-            lblPreferred.setText("-");
-            lblTeam.setText("-");
-            lblCreated.setText("-");
-            lblUpdated.setText("-");
-            return;
-        }
-        String full = (nullToEmpty(s.getFirstName()) + " " + nullToEmpty(s.getLastName())).trim();
-        lblFullName.setText(full.isEmpty() ? "—" : full);
-        lblPreferred.setText(emptyDash(s.getPreferredName()));
-        lblTeam.setText(emptyDash(s.getTeamName()));
-        // If your Swimmer doesn’t have timestamps yet, these will show “—”
-        try {
-            var created = s.getCreatedAt();
-            var updated = s.getUpdatedAt();
-            lblCreated.setText(created != null ? TS.format(created) : "—");
-            lblUpdated.setText(updated != null ? TS.format(updated) : "—");
-        } catch (Throwable ignored) {
-            lblCreated.setText("—");
-            lblUpdated.setText("—");
-        }
+    private void refreshDetails(Swimmer s) {
+        boolean has = (s != null);
+        lblName.setText(has ? joinNonBlank(s.getFirstName(), s.getLastName()) : "—");
+        lblPreferred.setText(has && s.getPreferredName() != null && !s.getPreferredName().isBlank()
+                ? s.getPreferredName() : "—");
+        lblTeam.setText(has && s.getTeamName() != null && !s.getTeamName().isBlank()
+                ? s.getTeamName() : "—");
+        lblCreated.setText(has && s.getCreatedAt() != null ? s.getCreatedAt().toString() : "—");
+        lblUpdated.setText(has && s.getUpdatedAt() != null ? s.getUpdatedAt().toString() : "—");
     }
 
-    private static String nullToEmpty(String s) { return s == null ? "" : s; }
-    private static String emptyDash(String s)   { return (s == null || s.isBlank()) ? "—" : s; }
+    // ---------------- Helpers ----------------
 
-    /** Primary accessor for embedding in layouts. */
-    public Parent node() { return root; }
+    private static Button makeIconButton(String iconName, String tooltip, Runnable action) {
+        Button b = new Button();
+        b.getStyleClass().add("icon-button");   // style in CSS
+        b.setMinSize(28, 28);
+        b.setPrefSize(28, 28);
+        b.setMaxSize(28, 28);
 
-    /** Alias for compatibility with callers using .root(). */
-    public Parent root() { return root; }
+        ImageView iv = null;
+        var url = SwimmerSection.class.getResource("/icons/" + iconName + ".png");
+        if (url != null) {
+            iv = new ImageView(new Image(url.toExternalForm(), 18, 18, true, true));
+        }
+        if (iv != null) b.setGraphic(iv); else b.setText("…"); // graceful fallback
+
+        if (tooltip != null && !tooltip.isBlank()) {
+            Tooltip.install(b, new Tooltip(tooltip));
+            b.setAccessibleText(tooltip);
+        }
+        if (action != null) b.setOnAction(e -> action.run());
+        return b;
+    }
+
+    private static String displayName(Swimmer s) {
+        if (s == null) return "";
+        String preferred = s.getPreferredName();
+        String first = s.getFirstName();
+        String last  = s.getLastName();
+        String left  = (preferred != null && !preferred.isBlank()) ? preferred :
+                (first != null ? first : "");
+        return (left + ((last != null && !last.isBlank()) ? " " + last : "")).trim();
+    }
+
+    private static String joinNonBlank(String a, String b) {
+        a = a == null ? "" : a.trim();
+        b = b == null ? "" : b.trim();
+        if (a.isEmpty()) return b;
+        if (b.isEmpty()) return a;
+        return a + " " + b;
+    }
 }

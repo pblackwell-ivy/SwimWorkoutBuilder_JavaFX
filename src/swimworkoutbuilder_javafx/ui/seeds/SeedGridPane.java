@@ -17,12 +17,12 @@ import swimworkoutbuilder_javafx.model.units.TimeSpan;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
 
-
 import java.util.EnumMap;
 import java.util.Map;
 
 public final class SeedGridPane extends BorderPane {
 
+    // Displayed unit only (model stays canonical = per 100m)
     private enum Unit { YD, M }
 
     private static final double YARD_TO_METER = 0.9144;
@@ -52,6 +52,10 @@ public final class SeedGridPane extends BorderPane {
         buildUI();
         initUnitsFromWorkout();
         wireState();
+        // Keep this pane in sync with AppState's current swimmer
+        var app = AppState.get();
+        bindSwimmer(app.getCurrentSwimmer()); // initial
+        app.currentSwimmerProperty().addListener((obs, oldS, newS) -> bindSwimmer(newS));
         setEditable(false);
     }
 
@@ -133,9 +137,8 @@ public final class SeedGridPane extends BorderPane {
         tf.setPrefColumnCount(6);
         tf.setMaxWidth(60);
         tf.textProperty().addListener((o, a, b) -> {
-            if (presenter.editingProperty().getValue()) presenter.markDirty();
+            if (presenter.editingProperty().get()) presenter.markDirty();
         });
-
 
         fields.put(stroke, tf);
 
@@ -144,6 +147,10 @@ public final class SeedGridPane extends BorderPane {
         GridPane.setHalignment(lbl, HPos.LEFT);
     }
 
+    /**
+     * Initialize display unit from current workout; on unit/workout change we
+     * re-render fields from canonical seeds instead of converting text in place.
+     */
     private void initUnitsFromWorkout() {
         Workout w = AppState.get().getCurrentWorkout();
         Course c = (w != null ? w.getCourse() : Course.SCY);
@@ -151,26 +158,24 @@ public final class SeedGridPane extends BorderPane {
         (yards ? rbYd : rbM).setSelected(true);
         displayUnit.set(yards ? Unit.YD : Unit.M);
 
-        final ObjectProperty<Unit> previous = new SimpleObjectProperty<>(displayUnit.get());
+        // Unit toggle: just change the flag and reload from swimmer
         unitGroup.selectedToggleProperty().addListener((obs, oldT, newT) -> {
             Unit newUnit = (newT == rbYd) ? Unit.YD : Unit.M;
-            Unit oldUnit = previous.get();
-            if (oldUnit != newUnit) {
-                convertAllFields(oldUnit, newUnit);
+            if (displayUnit.get() != newUnit) {
                 displayUnit.set(newUnit);
-                previous.set(newUnit);
+                loadFromSwimmer();
             }
         });
 
+        // Workout course changed externally (SCY/SCM/LCM) → update display unit and reload
         AppState.get().currentWorkoutProperty().addListener((o, oldW, newW) -> {
             if (newW != null && !rbYd.isFocused() && !rbM.isFocused()) {
                 boolean yd = (newW.getCourse() == Course.SCY);
                 Unit newU = yd ? Unit.YD : Unit.M;
-                Unit oldU = displayUnit.get();
-                if (newU != oldU) {
-                    convertAllFields(oldU, newU);
+                if (displayUnit.get() != newU) {
                     (yd ? rbYd : rbM).setSelected(true);
                     displayUnit.set(newU);
+                    loadFromSwimmer();
                 }
             }
         });
@@ -178,7 +183,7 @@ public final class SeedGridPane extends BorderPane {
 
     private void wireState() {
         btnEdit.setOnAction(e -> {
-            if (!hasSwimmer.getValue()) return;
+            if (!hasSwimmer.get()) return;
             presenter.beginEdit();
             setEditable(true);
         });
@@ -190,7 +195,7 @@ public final class SeedGridPane extends BorderPane {
         });
 
         btnSave.setOnAction(e -> {
-            if (!hasSwimmer.getValue()) return;
+            if (!hasSwimmer.get()) return;
             if (!saveIntoSwimmer(boundSwimmer)) return;
             try { LocalStore.saveSwimmer(boundSwimmer); } catch (Exception ignored) {}
             presenter.save();
@@ -198,9 +203,19 @@ public final class SeedGridPane extends BorderPane {
             if (onSeedsSaved != null) onSeedsSaved.run();
         });
 
-        btnEdit.disableProperty().bind( hasSwimmer.not().or(presenter.editingProperty()) );
-        btnSave.disableProperty().bind( presenter.canSaveProperty().not() );
-        btnCancel.disableProperty().bind( presenter.editingProperty().not() );
+        // Enable/disable by state
+        btnEdit.disableProperty().bind(
+                hasSwimmer.not().or(presenter.editingProperty())  // disable Edit while editing or no swimmer
+        );
+
+        btnSave.disableProperty().bind(
+                presenter.editingProperty().not()
+                        .or(presenter.canSaveProperty().not())    // Save only when editing AND canSave
+        );
+
+        btnCancel.disableProperty().bind(
+                presenter.editingProperty().not()                 // Cancel only when editing
+        );
     }
 
     private void setEditable(boolean editable) {
@@ -210,7 +225,7 @@ public final class SeedGridPane extends BorderPane {
     private void loadFromSwimmer() {
         for (var e : fields.entrySet()) {
             StrokeType st = e.getKey();
-            TimeSpan canonical100m = readCanonical100m(boundSwimmer, st);
+            TimeSpan canonical100m = readCanonical100m(boundSwimmer, st); // from model (m canonical)
             String txt = "";
             if (canonical100m != null) {
                 double canonSec = canonical100m.toMillis() / 1000.0;
@@ -227,13 +242,17 @@ public final class SeedGridPane extends BorderPane {
     // ===== Conversions =====
 
     private static double convertDisplayToCanonicalSeconds(double sec, Unit disp) {
+        // Display → canonical (per 100m). Yards should be larger when converted to meters.
         return (disp == Unit.YD) ? sec * METER_TO_YARD : sec;
     }
 
     private static double convertCanonicalToDisplaySeconds(double sec, Unit disp) {
+        // Canonical (100m) → display. Yards should be smaller (× 0.9144).
         return (disp == Unit.YD) ? sec * YARD_TO_METER : sec;
     }
 
+    // (Kept for possible future use, but no longer called during toggles)
+    @SuppressWarnings("unused")
     private void convertAllFields(Unit from, Unit to) {
         if (from == to) return;
         for (var e : fields.entrySet()) {

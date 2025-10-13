@@ -1,39 +1,38 @@
 /* =========================================
-   SwimWorkoutBuilder – Theme: Ocean Depth
+   SwimWorkoutBuilder – Theme: Aqua Modern
    ========================================= */
 
 /* 0) Tokens */
 .root {
-    -fx-font-family: "Inter", "Segoe UI", "SF Pro Text", "Roboto", "Arial", sans-serif;
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "Roboto", "Arial", sans-serif;
 
-    -swim-bg:           #F9F9F9;
+    /* palette */
+    -swim-bg:           #F7FAFC;
     -swim-surface:      #FFFFFF;
-    -swim-text:         #333333;
-    -swim-text-weak:    #6C757D;
+    -swim-text:         #0B1220;
+    -swim-text-weak:    #5B6876;
 
-    -swim-primary:      #0077B6; /* vibrant pool blue */
-    -swim-primary-600:  #005A8D; /* hover */
-    -swim-primary-700:  #004D78; /* pressed */
+    -swim-primary:      #0A84FF; /* hero blue */
+    -swim-primary-600:  #066AE1;
+    -swim-primary-700:  #0558BB;
 
-    -swim-secondary:    #4682B4; /* steel/cerulean */
-    -swim-accent:       #0FB5BA; /* optional for load/move */
-
-    -swim-success:      #28A745;
+    -swim-accent:       #0FB5BA; /* aquatic teal for load/move */
+    -swim-success:      #16A34A;
     -swim-warning:      #F59E0B;
-    -swim-danger:       #DC3545;
+    -swim-danger:       #D92D20;
 
     -swim-border:       #E6EAF0;
 
     -fx-background-color: -swim-bg;
 
     -fx-focus-color: #62AEFF;
-    -fx-faint-focus-color: rgba(98,174,255,0.22);
+    -fx-faint-focus-color: rgba(98,174,255,0.25);
 }
 
 /* 1) Global text */
 .label, .text { -fx-text-fill: -swim-text; -fx-font-size: 14px; }
 
-/* 2) Surfaces */
+/* 2) Surfaces / cards / forms */
 .surface, .grid-pane {
     -fx-background-color: -swim-surface;
     -fx-background-radius: 8px;
@@ -46,10 +45,10 @@
 
 /* 3) Headings */
 .label-header     { -fx-font-size: 22px; -fx-font-weight: 700; -fx-text-fill: -swim-text; -fx-padding: 0 0 8px 0; }
-.section-title    { -fx-font-size: 16px; -fx-font-weight: 700; -fx-text-fill: -swim-text; -fx-padding: 10px 0 6px 0; }
-.label-column-header { -fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -swim-text-weak; letter-spacing: 0.2px; }
+.section-title    { -fx-font-size: 18px; -fx-font-weight: 600; -fx-text-fill: -swim-text; -fx-padding: 12px 0 6px 0; }
+.label-column-header { -fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -swim-text-weak; -fx-opacity: .95; }
 
-/* workout header */
+/* workout header bits you already use */
 .workout-title { -fx-font-size: 16px; -fx-font-weight: 700; }
 .workout-notes { -fx-text-fill: -swim-text-weak; -fx-opacity: .9; }
 .metric-title  { -fx-font-size: 11px; -fx-text-fill: -swim-text-weak; }
@@ -59,8 +58,8 @@
 .text-field, .password-field {
     -fx-background-color: -swim-surface;
     -fx-text-fill: -swim-text;
-    -fx-prompt-text-fill: derive(-swim-text-weak, 20%);
-    -fx-border-color: #CCCCCC;
+    -fx-prompt-text-fill: derive(-swim-text-weak, 25%);
+    -fx-border-color: -swim-border;
     -fx-border-width: 1px;
     -fx-background-insets: 0;
     -fx-background-radius: 6px;
@@ -69,11 +68,11 @@
 }
 .text-field:focused, .password-field:focused {
     -fx-border-color: -swim-primary;
-    -fx-effect: dropshadow(gaussian, rgba(0,119,182,0.20), 8, 0.2, 0, 0);
+    -fx-effect: dropshadow(gaussian, rgba(10,132,255,0.18), 8, 0.2, 0, 0);
 }
 .seed-time-input { -fx-alignment: CENTER; }
 
-/* 5) Buttons */
+/* 5) Buttons (base + variants) */
 .button {
     -fx-background-radius: 8px;
     -fx-text-fill: white;
@@ -83,30 +82,30 @@
     -fx-cursor: hand;
 }
 
-/* primary (Save/New) */
-.button.primary { -fx-background-color: -swim-primary; }
+/* primary CTA (Save, New Workout) */
+.button.primary {
+    -fx-background-color: -swim-primary;
+}
 .button.primary:hover { -fx-background-color: -swim-primary-600; }
 .button.primary:armed { -fx-background-color: -swim-primary-700; }
 .button.primary:disabled { -fx-opacity: .5; }
 
-/* secondary (Edit/Load) – steel blue */
+/* secondary (Edit, Cancel) */
 .button.secondary {
-    -fx-background-color: transparent;
-    -fx-text-fill: -swim-secondary;
-    -fx-border-color: -swim-secondary;
-    -fx-border-width: 1px;
-    -fx-border-radius: 8px;
+    -fx-background-color: #EEF2F6;
+    -fx-text-fill: -swim-text;
 }
-.button.secondary:hover { -fx-background-color: #E6F2FF; }
+.button.secondary:hover { -fx-background-color: #E3E9F0; }
+.button.secondary:armed { -fx-background-color: #D9E2EC; }
 
-/* ghost */
+/* ghost (toolbar / quiet actions) */
 .button.ghost {
     -fx-background-color: transparent;
     -fx-text-fill: -swim-text-weak;
 }
-.button.ghost:hover { -fx-background-color: #EEEEEE; -fx-text-fill: -swim-text; }
+.button.ghost:hover { -fx-background-color: rgba(0,0,0,0.05); -fx-text-fill: -swim-text; }
 
-/* icon-only */
+/* icon-only (24–32 px hit area) */
 .button.icon {
     -fx-background-color: transparent;
     -fx-padding: 6px;
@@ -114,7 +113,7 @@
     -fx-max-width: 32px; -fx-max-height: 32px;
     -fx-text-fill: -swim-text-weak;
 }
-.button.icon:hover { -fx-background-color: rgba(0,119,182,0.08); -fx-text-fill: -swim-text; }
+.button.icon:hover { -fx-background-color: rgba(10,132,255,0.06); -fx-text-fill: -swim-text; }
 
 /* intents */
 .button.accent { -fx-background-color: -swim-accent; }
@@ -127,10 +126,10 @@
 .button.warn:hover { -fx-background-color: derive(-swim-warning, -10%); }
 
 .button.danger { -fx-background-color: -swim-danger; }
-.button.danger:hover { -fx-background-color: #B92E3A; }
+.button.danger:hover { -fx-background-color: derive(-swim-danger, -10%); }
 
 /* 6) Set/Workout labels */
-.label-setgroup-name { -fx-font-size: 15px; -fx-font-weight: 700; }
+.label-setgroup-name { -fx-font-size: 15px; -fx-font-weight: 600; }
 .label-setgroup-rep  { -fx-font-size: 12px; -fx-text-fill: -swim-text-weak; }
 .label-setgroup-note { -fx-font-size: 12px; -fx-text-fill: -swim-text-weak; -fx-font-style: italic; }
 
@@ -144,13 +143,13 @@
 
 /* Effort chips */
 .chip {
-    -fx-background-color: #E6F2FF;
+    -fx-background-color: #EEF6FF;
     -fx-text-fill: -swim-primary;
     -fx-background-radius: 999;
     -fx-padding: 2px 8px;
     -fx-font-size: 12px;
-    -fx-font-weight: 700;
-    -fx-border-color: rgba(0,119,182,0.18);
+    -fx-font-weight: 600;
+    -fx-border-color: rgba(10,132,255,0.15);
     -fx-border-radius: 999;
 }
 
@@ -158,4 +157,4 @@
 .toolbar { -fx-background-color: -swim-surface; -fx-padding: 8px; -fx-border-color: -swim-border; -fx-border-width: 0 0 1px 0; }
 .muted   { -fx-text-fill: -swim-text-weak; }
 .help    { -fx-text-fill: -swim-text-weak; -fx-font-size: 12px; }
-.row:hover { -fx-background-color: rgba(0,119,182,0.08); }
+.row:hover { -fx-background-color: rgba(10,132,255,0.06); }

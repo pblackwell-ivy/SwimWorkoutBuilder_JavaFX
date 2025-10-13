@@ -13,8 +13,8 @@ package swimworkoutbuilder_javafx.model.units;
  *   <li>Internally stores time as a {@code long} number of milliseconds for exact arithmetic.</li>
  *   <li>Immutable — all operations return new {@code TimeSpan} instances.</li>
  *   <li>Implements {@link Comparable} for natural ordering by duration.</li>
- *   <li>Used in conjunction with {@link swimworkoutbuilder.model.units.Distance} and
- *       {@link swimworkoutbuilder.model.pacing.SeedPace} for pacing calculations.</li>
+ *   <li>Used in conjunction with {@link swimworkoutbuilder_javafx.model.units.Distance} and
+ *       {@link swimworkoutbuilder_javafx.model.pacing.SeedPace} for pacing calculations.</li>
  * </ul>
  *
  * <h2>Typical Usage</h2>
@@ -28,8 +28,8 @@ package swimworkoutbuilder_javafx.model.units;
  *
  * @author Parker Blackwell
  * @version MVP 1.0 (October 2025)
- * @see swimworkoutbuilder.model.units.Distance
- * @see swimworkoutbuilder.model.pacing.SeedPace
+ * @see swimworkoutbuilder_javafx.model.units.Distance
+ * @see swimworkoutbuilder_javafx.model.pacing.SeedPace
  */
 public final class TimeSpan implements Comparable<TimeSpan>, java.io.Serializable {
     private static final long serialVersionUID = 1L;

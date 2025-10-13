@@ -176,6 +176,16 @@ public final class Distance implements Comparable<Distance>, java.io.Serializabl
                 .divide(BigDecimal.valueOf(MICROUNITS_PER_YARD), scale, java.math.RoundingMode.HALF_UP);
     }
 
+    /** Short human-readable form in the preferred display unit, e.g. "200 yd" or "150 m". */
+    public String toShortString() {
+        double value = (display == Unit.YARDS) ? toYards() : toMeters();
+        // Round to 1 decimal, but strip trailing .0
+        double oneDecimal = Math.rint(value * 10.0) / 10.0;
+        boolean isIntLike = Math.abs(oneDecimal - Math.rint(oneDecimal)) < 1e-9;
+        String num = isIntLike ? String.format("%.0f", oneDecimal) : String.format("%.1f", oneDecimal);
+        return num + (display == Unit.YARDS ? " yd" : " m");
+    }
+
     @Override public String toString() {
         return display == Unit.METERS
                 ? metersAsBigDecimal() + " m"
