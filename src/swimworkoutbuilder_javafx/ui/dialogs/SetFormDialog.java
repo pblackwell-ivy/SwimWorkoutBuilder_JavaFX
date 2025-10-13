@@ -36,6 +36,14 @@ public final class SetFormDialog {
 
         ButtonType BT_SAVE = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
         swimSetDialog.getDialogPane().getButtonTypes().addAll(BT_SAVE, ButtonType.CANCEL);
+        // --- NEW: style the dialog buttons after ButtonTypes are set ---
+        Button btnSave   = (Button) swimSetDialog.getDialogPane().lookupButton(BT_SAVE);          // NEW
+        Button btnCancel = (Button) swimSetDialog.getDialogPane().lookupButton(ButtonType.CANCEL); // NEW
+        if (btnSave != null)   btnSave.getStyleClass().addAll("button", "primary");               // NEW
+        if (btnCancel != null) btnCancel.getStyleClass().addAll("button", "secondary");           // NEW
+
+        // --- NEW: give the dialog pane a "card" look ---
+        swimSetDialog.getDialogPane().getStyleClass().add("surface");  // NEW
 
         // --- Controls ---
         ComboBox<StrokeType> cbStroke = new ComboBox<>();
@@ -107,6 +115,7 @@ public final class SetFormDialog {
         gp.setHgap(8);
         gp.setVgap(8);
         gp.setPadding(new Insets(12));
+        gp.getStyleClass().add("grid-pane"); // NEW — themed form grid
 
         int r = 0;
         gp.add(new Label("Stroke:"), 0, r); gp.add(cbStroke, 1, r++);

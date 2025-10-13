@@ -38,17 +38,27 @@ public final class SwimmerChooserPane extends HBox {
         setAlignment(Pos.CENTER_LEFT);
         setSpacing(8);
         setPadding(new Insets(8));
+        getStyleClass().add("toolbar"); // new
 
+        // Label
         Label lbl = new Label("Swimmer:");
+        lbl.getStyleClass().add("label-column-header"); // new
+
+        // buttons:
+        btnAdd.getStyleClass().addAll("button","success");       // new
+        btnEdit.getStyleClass().addAll("button","secondary");    // new
+        btnDelete.getStyleClass().addAll("button","danger");     // new
         combo.setMaxWidth(Double.MAX_VALUE);
         combo.setVisibleRowCount(10);
 
         // stop buttons shrinking to “...”
+
         btnAdd.setMinWidth(60);
         btnEdit.setMinWidth(60);
         btnDelete.setMinWidth(70);
 
         HBox.setHgrow(combo, Priority.ALWAYS);
+        getStyleClass().add("toolbar");
         getChildren().addAll(lbl, combo, btnAdd, btnEdit, btnDelete);
     }
 

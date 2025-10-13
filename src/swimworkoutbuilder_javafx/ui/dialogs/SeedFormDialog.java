@@ -44,9 +44,12 @@ public class SeedFormDialog {
         Button btnDelete = new Button("Delete");
         Button btnSave = new Button("Save");
         Button btnCancel = new Button("Cancel");
+        btnSave.getStyleClass().addAll("button","primary");     // new
+        btnCancel.getStyleClass().addAll("button","secondary"); // new
         btnSave.setDefaultButton(true);
         btnCancel.setCancelButton(true);
         btnDelete.setDisable(true);
+
 
         TableView<Row> table = new TableView<>();
         TableColumn<Row, String> colStroke = new TableColumn<>("Stroke");

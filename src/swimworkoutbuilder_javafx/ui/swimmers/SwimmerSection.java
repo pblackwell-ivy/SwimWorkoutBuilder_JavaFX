@@ -62,7 +62,13 @@ public final class SwimmerSection {
 
         // Toolbar row
         HBox top = new HBox(8, new Label("Swimmer:"), cbSwimmer, btnAddSwimmer, btnEdit, btnDelete);
+        top.getStyleClass().add("toolbar");                                                 // new
+        ((Label)top.getChildren().get(0)).getStyleClass().add("label-column-header");       // new
         HBox.setHgrow(cbSwimmer, Priority.ALWAYS);
+
+        btnAddSwimmer.getStyleClass().addAll("secondary","sm");         // new
+        btnEdit.getStyleClass().addAll("secondary","sm");               // new
+        btnDelete.getStyleClass().addAll("danger","sm");                // new
 
         GridPane info = new GridPane();
         info.setHgap(8);

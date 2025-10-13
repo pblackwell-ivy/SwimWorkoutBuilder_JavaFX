@@ -23,7 +23,13 @@ public class ActionBar {
 
     public ActionBar() {
         root.setPadding(new Insets(8, 12, 8, 12));
+        // after: private final HBox root = new HBox(10);
+        root.getStyleClass().add("toolbar"); // new
 
+        // after creating buttons:
+        btnNewWorkout.getStyleClass().addAll("button","primary");     // new
+        btnLoadWorkout.getStyleClass().addAll("button","secondary");  // new
+        btnPrint.getStyleClass().addAll("button","secondary");        // new
         // Left-side action buttons only (no swimmer chooser here anymore)
         root.getChildren().addAll(btnNewWorkout, btnLoadWorkout, btnPrint);
 

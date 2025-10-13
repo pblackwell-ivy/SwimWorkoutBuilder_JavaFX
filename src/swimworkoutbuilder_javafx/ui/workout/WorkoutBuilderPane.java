@@ -39,9 +39,12 @@ public final class WorkoutBuilderPane {
     // ---------------------------------------------------------------------
     private void buildUI() {
         root.setPadding(new Insets(10));
+        root.setSpacing(8);
         root.setFillWidth(true);
+        root.getStyleClass().add("surface");            // new
 
         Button btnAddGroup = new Button("+ Add Group");
+        btnAddGroup.getStyleClass().addAll("button","primary"); // new
         btnAddGroup.setOnAction(e -> {
             TextInputDialog dlg = new TextInputDialog("New Group");
             dlg.setTitle("Add Group");
@@ -52,6 +55,7 @@ public final class WorkoutBuilderPane {
         });
 
         HBox header = new HBox(8, btnAddGroup);
+        header.getStyleClass().add("toolbar");          // new
         header.setAlignment(Pos.CENTER_LEFT);
 
         root.getChildren().addAll(header, new Separator(), groupsBox);
@@ -72,6 +76,7 @@ public final class WorkoutBuilderPane {
     // ---------------------------------------------------------------------
     private void refresh() {
         groupsBox.getChildren().clear();
+        groupsBox.setSpacing(10);
 
         List<SetGroup> groups = presenter.groups();
         if (groups == null || groups.isEmpty()) {
@@ -88,13 +93,16 @@ public final class WorkoutBuilderPane {
 
     private Node renderGroup(int gi, SetGroup g) {
         Label lbl = new Label(formatGroupTitle(g));
+        lbl.getStyleClass().add("label-setgroup-name");          // new
 
         Button btnAdd = new Button("+ Set");
+        btnAdd.getStyleClass().addAll("button","secondary","sm");     // new
         btnAdd.setOnAction(e -> {
             SetFormDialog.show(null).ifPresent(set -> presenter.addSet(gi, set));
         });
 
         Button btnDel = new Button("🗑");
+        btnDel.getStyleClass().addAll("button","danger", "sm");        // new
         btnDel.setTooltip(new Tooltip("Delete group"));
         btnDel.setOnAction(e -> {
             Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
@@ -106,15 +114,17 @@ public final class WorkoutBuilderPane {
         });
 
         Button btnUp = new Button("↑");
+        btnUp.getStyleClass().addAll("button","secondary", "sm");      // new
         btnUp.setOnAction(e -> presenter.moveGroupUp(gi));
         Button btnDown = new Button("↓");
+        btnDown.getStyleClass().addAll("button","secondary","sm");    // new
         btnDown.setOnAction(e -> presenter.moveGroupDown(gi));
 
         HBox titleBar = new HBox(8, lbl, spacer(), btnAdd, btnUp, btnDown, btnDel);
         titleBar.setAlignment(Pos.CENTER_LEFT);
         titleBar.getStyleClass().add("wb-group-header");
 
-        VBox setsBox = new VBox(6);
+        VBox setsBox = new VBox(4);
         if (g.getSets() != null) {
             for (int si = 0; si < g.getSets().size(); si++) {
                 SwimSet s = g.getSets().get(si);
@@ -122,7 +132,7 @@ public final class WorkoutBuilderPane {
             }
         }
 
-        VBox groupBox = new VBox(6, titleBar, setsBox, new Separator());
+        VBox groupBox = new VBox(4, titleBar, setsBox, new Separator());
         groupBox.setPadding(new Insets(4, 0, 4, 0));
         groupBox.getStyleClass().add("wb-group");
         return groupBox;
@@ -130,26 +140,33 @@ public final class WorkoutBuilderPane {
 
     private Node renderSetRow(int gi, int si, SwimSet s) {
         Label lbl = new Label(formatSetLine(s));
+        lbl.getStyleClass().add("label-set-primary");            // new
 
         Button btnEdit = new Button("✎");
+        btnEdit.getStyleClass().addAll("button","secondary","sm");    // new
+
         btnEdit.setTooltip(new Tooltip("Edit set"));
         btnEdit.setOnAction(e -> {
             SetFormDialog.show(s).ifPresent(newSet -> presenter.replaceSet(gi, si, newSet));
         });
 
         Button btnUp = new Button("↑");
+        btnUp.getStyleClass().addAll("button","secondary", "sm");      // new
         btnUp.setTooltip(new Tooltip("Move set up"));
         btnUp.setOnAction(e -> presenter.moveSetUp(gi, si));
 
         Button btnDown = new Button("↓");
+        btnDown.getStyleClass().addAll("button","secondary","sm");    // new
         btnDown.setTooltip(new Tooltip("Move set down"));
         btnDown.setOnAction(e -> presenter.moveSetDown(gi, si));
 
         Button btnDelete = new Button("🗑");
+        btnDelete.getStyleClass().addAll("button","danger", "sm");     // new
         btnDelete.setTooltip(new Tooltip("Delete set"));
         btnDelete.setOnAction(e -> presenter.deleteSet(gi, si));
 
         HBox row = new HBox(8, lbl, spacer(), btnEdit, btnUp, btnDown, btnDelete);
+        row.getStyleClass().addAll("wb-set-row","row");          // 'row' enables subtle hover
         row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("wb-set-row");
         return row;

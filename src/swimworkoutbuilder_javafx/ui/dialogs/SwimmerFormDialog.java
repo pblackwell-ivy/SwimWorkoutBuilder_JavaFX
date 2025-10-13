@@ -37,6 +37,7 @@ public final class SwimmerFormDialog {
                 (existing.getTeamName() == null ? "" : existing.getTeamName()));
 
         GridPane grid = new GridPane();
+        grid.getStyleClass().add("grid-pane");
         grid.setHgap(8); grid.setVgap(8); grid.setPadding(new Insets(12));
         int r = 0;
         grid.add(new Label("First name:"), 0, r); grid.add(tfFirst, 1, r++);
@@ -54,6 +55,7 @@ public final class SwimmerFormDialog {
         buttons.setPadding(new Insets(8));
 
         BorderPane root = new BorderPane(grid);
+        dialog.getScene().getRoot().getStyleClass().add("surface");
         root.setBottom(buttons);
 
         final Swimmer[] result = new Swimmer[1];

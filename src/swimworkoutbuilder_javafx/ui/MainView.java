@@ -30,22 +30,24 @@ public final class MainView extends BorderPane {
 
         // LEFT: Swimmer info + seed grid
         VBox leftColumn = new VBox(12, swimmerSection.node(), seedGridPane);
+        leftColumn.getStyleClass().add("surface");              // new
         leftColumn.setPadding(new Insets(8, 12, 8, 12));
         leftColumn.setPrefWidth(300);
         setLeft(leftColumn);
 
         // CENTER: Workout header + builder
         VBox centerColumn = new VBox(12, headerPane.node(), builderPane.node());
+        centerColumn.getStyleClass().add("surface");            // new
         VBox.setVgrow(builderPane.node(), Priority.ALWAYS);
         centerColumn.setPadding(new Insets(8));
         setCenter(centerColumn);
 
         // RIGHT: Preview placeholder
         VBox rightColumn = new VBox();
+        rightColumn.getStyleClass().add("surface");             // new
         rightColumn.setPadding(new Insets(8, 12, 8, 8));
-        rightColumn.setAlignment(Pos.TOP_LEFT);
         Label previewLabel = new Label("Preview (coming soon)");
-        previewLabel.getStyleClass().add("text-subtle");
+        previewLabel.getStyleClass().add("muted");              // was text-subtle -> muted
         rightColumn.getChildren().add(previewLabel);
         setRight(rightColumn);
 

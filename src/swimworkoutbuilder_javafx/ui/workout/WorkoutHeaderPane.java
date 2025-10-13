@@ -34,15 +34,20 @@ public final class WorkoutHeaderPane {
     private Workout current;
 
     public WorkoutHeaderPane(AppState app /* kept for future presenter hooks */) {
+        // Style updates - inside constructor, after creating fields:
+        root.getStyleClass().add("surface");          // gives it a card look
+
+        tfName.getStyleClass().add("workout-title");  // new
+        lblSummary.getStyleClass().add("metric-value"); // new
+        lblNotes.getStyleClass().add("workout-notes");  // new
+        lblTimestamps.getStyleClass().add("muted");     // new (was text-subtle)
+
         // Layout
         root.setPadding(new Insets(8, 8, 8, 8));
         root.getStyleClass().add("workout-header");
 
         tfName.setPromptText("Workout name");
         tfName.setPrefColumnCount(24);
-
-        lblNotes.getStyleClass().add("text-subtle");
-        lblSummary.getStyleClass().add("text-strong");
 
         HBox topRow = new HBox(10, tfName);
         HBox.setHgrow(tfName, Priority.ALWAYS);
@@ -107,7 +112,6 @@ public final class WorkoutHeaderPane {
         if (!created.isBlank()) ts = "Created: " + created;
         if (!updated.isBlank()) ts = (ts.isBlank() ? "" : ts + "   ") + "Updated: " + updated;
         lblTimestamps.setText(ts);
-        lblTimestamps.getStyleClass().add("text-subtle");
     }
 
     private static String safe(String s) { return s == null ? "" : s; }

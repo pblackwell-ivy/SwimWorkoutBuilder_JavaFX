@@ -44,6 +44,11 @@ public final class SwimmerPane {
     private void buildUI() {
         root.setPadding(new Insets(8));
 
+        // Button styling
+        btnEdit.getStyleClass().add("secondary");       // new
+        btnSave.getStyleClass().add("primary");         // new
+        btnCancel.getStyleClass().add("ghost");         // new
+
         // Left list
         list.setPrefWidth(220);
         list.setCellFactory(v -> new ListCell<>() {
@@ -62,6 +67,7 @@ public final class SwimmerPane {
 
         // Right form
         GridPane form = new GridPane();
+        form.getStyleClass().add("grid-pane");          // new
         form.setHgap(8);
         form.setVgap(8);
         form.addRow(0, new Label("First name:"), tfFirst);
@@ -75,6 +81,7 @@ public final class SwimmerPane {
         actions.setAlignment(Pos.CENTER_RIGHT);
 
         VBox right = new VBox(10, form, actions);
+        right.getStyleClass().add("surface");           // new
         right.setFillWidth(true);
         root.setCenter(right);
 

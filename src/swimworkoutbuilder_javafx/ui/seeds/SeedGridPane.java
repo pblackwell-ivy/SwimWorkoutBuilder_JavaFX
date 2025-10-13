@@ -40,6 +40,7 @@ public final class SeedGridPane extends BorderPane {
     private final Button btnSave = new Button("Save");
     private final Button btnCancel = new Button("Cancel");
 
+
     private final Map<StrokeType, TextField> fields = new EnumMap<>(StrokeType.class);
 
     private final SeedTimesPresenter presenter = new SeedTimesPresenter(AppState.get());
@@ -100,6 +101,10 @@ public final class SeedGridPane extends BorderPane {
         GridPane.setHalignment(colStroke, HPos.LEFT);
         GridPane.setHalignment(colTime, HPos.CENTER);
 
+        btnEdit.getStyleClass().addAll("button", "primary");   // subtle outline gray-blue
+        btnSave.getStyleClass().addAll("button", "ghost");     // main action (blue)
+        btnCancel.getStyleClass().addAll("button", "ghost");     // quiet, transparent
+
         // Add each stroke starting at row = 1
         int row = 1;
         for (StrokeType st : StrokeType.values()) {
@@ -126,6 +131,14 @@ public final class SeedGridPane extends BorderPane {
         // initial visual (bindings take over later)
         btnSave.setDisable(true);
         btnCancel.setDisable(true);
+    }
+
+    // --- helper ---
+    private static void setRoles(Button b, String... roles) {
+        // keep "button" + role; remove previous role(s)
+        b.getStyleClass().removeAll("primary","secondary","ghost","success","danger","sm");
+        b.getStyleClass().add("button");
+        b.getStyleClass().addAll(roles);
     }
 
     private void addRow(int row, StrokeType stroke) {
@@ -182,6 +195,19 @@ public final class SeedGridPane extends BorderPane {
     }
 
     private void wireState() {
+        // this listener section is new
+        presenter.editingProperty().addListener((obs, wasEditing, isEditing) -> {
+            if (isEditing) {
+                setRoles(btnEdit, "ghost");     // fades while editing
+                setRoles(btnSave, "primary");   // main action
+                setRoles(btnCancel, "secondary");
+            } else {
+                setRoles(btnEdit, "primary");   // back to single obvious action
+                setRoles(btnSave, "ghost");
+                setRoles(btnCancel, "ghost");
+            }
+        });
+
         btnEdit.setOnAction(e -> {
             if (!hasSwimmer.get()) return;
             presenter.beginEdit();

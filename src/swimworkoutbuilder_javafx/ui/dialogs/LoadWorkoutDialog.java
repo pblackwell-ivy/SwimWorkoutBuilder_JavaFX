@@ -1,6 +1,6 @@
 package swimworkoutbuilder_javafx.ui.dialogs;
 
-import javafx.geometry.Insets;
+import javafx.geometry.*;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
@@ -10,9 +10,12 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.store.LocalStore;
+import swimworkoutbuilder_javafx.ui.Theme;
 
+import java.net.URL;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public final class LoadWorkoutDialog {
@@ -55,6 +58,8 @@ public final class LoadWorkoutDialog {
 
         Button btnOpen = new Button("Open");
         Button btnCancel = new Button("Cancel");
+        btnOpen.getStyleClass().addAll("button","primary");     // new
+        btnCancel.getStyleClass().addAll("button","secondary"); // new
         btnOpen.setDefaultButton(true);
         btnCancel.setCancelButton(true);
         btnOpen.setDisable(true);
@@ -79,13 +84,19 @@ public final class LoadWorkoutDialog {
         btnCancel.setOnAction(e -> { result[0] = null; dialog.close(); });
 
         BorderPane root = new BorderPane(list);
+        root.getStyleClass().add("surface");           // new
         HBox buttons = new HBox(10, btnCancel, btnOpen);
         buttons.setPadding(new Insets(8));
-        buttons.setStyle("-fx-alignment: center-right;");
+        buttons.setAlignment(Pos.CENTER_RIGHT);
+        buttons.getStyleClass().add("toolbar");     // new
         root.setBottom(buttons);
         root.setPadding(new Insets(8));
 
-        dialog.setScene(new Scene(root, 520, 380));
+        Scene scene = new Scene(root, 520, 380);
+        Theme.apply(scene, LoadWorkoutDialog.class);
+        dialog.setScene(scene);
+
+        dialog.setScene(scene);
         dialog.showAndWait();
         return result[0];
     }

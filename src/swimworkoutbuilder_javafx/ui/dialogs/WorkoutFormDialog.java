@@ -9,8 +9,11 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.model.enums.Course;
+import swimworkoutbuilder_javafx.ui.Theme;
 import swimworkoutbuilder_javafx.ui.UiUtil;
 
+import java.net.URL;
+import java.util.Objects;
 import java.util.UUID;
 
 public class WorkoutFormDialog {
@@ -39,9 +42,15 @@ public class WorkoutFormDialog {
         taNotes.setTextFormatter(UiUtil.maxLen(100));
         taNotes.setPrefRowCount(8);
         taNotes.setWrapText(true);
+        // QUIETER FORM LABELS (theme style)
+        lblName.getStyleClass().add("label-column-header");    // NEW
+        lblCourse.getStyleClass().add("label-column-header");  // NEW
+        lblNotes.getStyleClass().add("label-column-header");   // NEW
 
         Button btnSave = new Button("Save");
         Button btnCancel = new Button("Cancel");
+        btnSave.getStyleClass().addAll("button","primary");     // new
+        btnCancel.getStyleClass().addAll("button","secondary"); // new
         btnSave.setDefaultButton(true);
         btnCancel.setCancelButton(true);
         btnSave.setMinWidth(90);
@@ -60,6 +69,9 @@ public class WorkoutFormDialog {
         gp.setVgap(10);
         gp.setPadding(new Insets(16));
 
+        // THEMED FORM + CARD SURFACE
+        gp.getStyleClass().addAll("grid-pane", "surface");     // NEW
+
         // Column sizing: labels fixed width, fields grow
         ColumnConstraints c0 = new ColumnConstraints();
         c0.setMinWidth(90);
@@ -75,6 +87,7 @@ public class WorkoutFormDialog {
 
         HBox buttons = new HBox(10, btnSave, btnCancel);
         buttons.setAlignment(Pos.CENTER_RIGHT);
+        buttons.getStyleClass().add("toolbar");
         gp.add(buttons, 1, 3);
 
         // Field growth
@@ -109,7 +122,10 @@ public class WorkoutFormDialog {
 
         btnCancel.setOnAction(e -> { result[0] = null; dialog.close(); });
 
-        dialog.setScene(new Scene(gp, 520, 360));
+        Scene scene = new Scene(gp, 520, 360);
+        Theme.apply(scene, WorkoutFormDialog.class);
+        dialog.setScene(scene);
+
         dialog.setResizable(false);
         dialog.showAndWait();
         return result[0];
