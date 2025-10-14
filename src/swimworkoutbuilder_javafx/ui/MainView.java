@@ -24,7 +24,7 @@ public final class MainView extends BorderPane {
     private final WorkoutBuilderPresenter builderPresenter = new WorkoutBuilderPresenter(app);
     private final WorkoutHeaderPane headerPane = new WorkoutHeaderPane(app);
     private final WorkoutBuilderPane builderPane = new WorkoutBuilderPane(builderPresenter);
-    private final ActionBar actionBar = new ActionBar(builderPresenter); // ✅ passes presenter
+    private final ActionBar actionBar = new ActionBar(); // ✅ passes presenter
 
 
     public MainView() {
@@ -43,6 +43,8 @@ public final class MainView extends BorderPane {
         VBox.setVgrow(builderPane.node(), Priority.ALWAYS);
         centerColumn.setPadding(new Insets(8));
         setCenter(centerColumn);
+
+        headerPane.bindPresenter(builderPresenter); // forces live header update when groups/sets change
 
         // RIGHT: Preview placeholder
         VBox rightColumn = new VBox();

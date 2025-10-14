@@ -51,7 +51,7 @@
 .label-column-header { -fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -swim-text-weak; -fx-opacity: .95; }
 
 /* workout header bits */
-.workout-title { -fx-font-size: 16px; -fx-font-weight: 700; }
+.workout-title { -fx-font-size: 24px; -fx-font-weight: 700; }
 .workout-notes { -fx-text-fill: -swim-text-weak; -fx-opacity: .9; }
 .metric-title  { -fx-font-size: 11px; -fx-text-fill: -swim-text-weak; }
 .metric-value  { -fx-font-size: 14px; -fx-font-weight: 600; }

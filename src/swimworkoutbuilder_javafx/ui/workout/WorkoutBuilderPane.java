@@ -8,6 +8,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import swimworkoutbuilder_javafx.model.SetGroup;
 import swimworkoutbuilder_javafx.model.SwimSet;
+import swimworkoutbuilder_javafx.model.enums.Course;
 
 import java.util.List;
 import java.util.Objects;
@@ -45,14 +46,12 @@ public final class WorkoutBuilderPane {
 
         Button btnAddGroup = new Button("+ Add Group");
         btnAddGroup.getStyleClass().addAll("button","primary"); // new
-        btnAddGroup.setOnAction(e -> {
-            TextInputDialog dlg = new TextInputDialog("New Group");
-            dlg.setTitle("Add Group");
-            dlg.setHeaderText(null);
-            dlg.setContentText("Group name:");
-            String name = dlg.showAndWait().orElse("").trim();
-            if (!name.isEmpty()) presenter.addGroup(name);
-        });
+
+        btnAddGroup.setOnAction(e -> {                                              // CHANGED
+            swimworkoutbuilder_javafx.ui.dialogs.SetGroupFormDialog                    // NEW
+                    .show("Add Group", "New Group", 1, null)                             // NEW
+                    .ifPresent(v -> presenter.addGroup(v.name, v.reps, v.notes));        // NEW
+        });                                                                          // CHANGED
 
         HBox header = new HBox(8, btnAddGroup);
         header.getStyleClass().add("toolbar");          // new
@@ -193,12 +192,17 @@ public final class WorkoutBuilderPane {
         return name + (reps > 1 ? " ×" + reps : "") + notes;
     }
 
+    // Uses m/yd based on the set's course
     private static String formatSetLine(SwimSet s) {
         int reps = Math.max(1, s.getReps());
-        long yards = Math.round(s.getDistancePerRep().toYards());
+        boolean meters = (s.getCourse() == Course.SCM || s.getCourse() == Course.LCM);
+        long amount = meters
+                ? Math.round(s.getDistancePerRep().toMeters())
+                : Math.round(s.getDistancePerRep().toYards());
+        String unit = meters ? " m" : " yd";
         String stroke = (s.getStroke() == null) ? "—" : s.getStroke().getLabel();
         String effort = (s.getEffort() == null) ? "" : " @" + s.getEffort().name();
         String notes = (s.getNotes() == null || s.getNotes().isBlank()) ? "" : " — " + s.getNotes().trim();
-        return reps + "×" + yards + " yd " + stroke + effort + notes;
+        return reps + "×" + amount + unit + " " + stroke + effort + notes;
     }
 }

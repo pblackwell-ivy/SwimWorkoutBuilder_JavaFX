@@ -3,28 +3,25 @@ package swimworkoutbuilder_javafx.ui.swimmers;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.*;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.util.StringConverter;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
+import swimworkoutbuilder_javafx.ui.DateFmt;
+
+import java.util.Objects;
 
 public final class SwimmerSection {
 
-    private final VBox root = new VBox(8);
+    private final VBox root = new VBox(10);
 
+    private final Label lblSelector = new Label("Swimmer");
     private final ComboBox<Swimmer> cbSwimmer = new ComboBox<>();
-    private final Button btnAddSwimmer = makeIconButton("plus", "Add swimmer", this::onAddSwimmer);
-    private final Button btnEdit       = makeIconButton("pencil", "Edit swimmer", () ->
-            new Alert(Alert.AlertType.INFORMATION, "Edit Swimmer (coming soon)").showAndWait()
-    );
-    private final Button btnDelete     = makeIconButton("trash", "Delete swimmer", () ->
-            new Alert(Alert.AlertType.INFORMATION, "Delete Swimmer (coming soon)").showAndWait()
-    );
+    private final Button btnAdd = new Button("+");
+    private final Button btnEdit = new Button("✎");
+    private final Button btnDelete = new Button("🗑");
 
-    private final Label lblName = new Label();
     private final Label lblPreferred = new Label();
     private final Label lblTeam = new Label();
     private final Label lblCreated = new Label();
@@ -40,9 +37,13 @@ public final class SwimmerSection {
     // ---------------- UI ----------------
 
     private void buildUI() {
-        root.setPadding(new Insets(6, 10, 6, 10));
+        root.setPadding(new Insets(8, 10, 8, 10));
+        root.setFillWidth(true); // important so children can grow
 
-        // Combo label formatting
+        // Top label (on its own row to avoid squeezing the selector)
+        lblSelector.getStyleClass().add("label-column-header");
+
+        // Combo formatting
         cbSwimmer.setConverter(new StringConverter<>() {
             @Override public String toString(Swimmer s) { return displayName(s); }
             @Override public Swimmer fromString(String string) { return null; }
@@ -60,31 +61,59 @@ public final class SwimmerSection {
             }
         });
 
-        // Toolbar row
-        HBox top = new HBox(8, new Label("Swimmer:"), cbSwimmer, btnAddSwimmer, btnEdit, btnDelete);
-        top.getStyleClass().add("toolbar");                                                 // new
-        ((Label)top.getChildren().get(0)).getStyleClass().add("label-column-header");       // new
+        // Sizing + roles
+        cbSwimmer.setMaxWidth(Double.MAX_VALUE);
+        btnAdd.getStyleClass().addAll("button","accent","icon","sm");
+        btnEdit.getStyleClass().addAll("button","secondary","icon","sm");
+        btnDelete.getStyleClass().addAll("button","danger","icon","sm");
+
+        btnAdd.setTooltip(new Tooltip("Add swimmer"));
+        btnEdit.setTooltip(new Tooltip("Edit swimmer"));
+        btnDelete.setTooltip(new Tooltip("Delete swimmer"));
+
+        HBox selectorRow = new HBox(8, cbSwimmer, btnAdd, btnEdit, btnDelete);
         HBox.setHgrow(cbSwimmer, Priority.ALWAYS);
+        selectorRow.getStyleClass().add("toolbar");
 
-        btnAddSwimmer.getStyleClass().addAll("secondary","sm");         // new
-        btnEdit.getStyleClass().addAll("secondary","sm");               // new
-        btnDelete.getStyleClass().addAll("danger","sm");                // new
-
+        // Details grid (no “Name” row — the selector already shows it)
         GridPane info = new GridPane();
+        info.getStyleClass().add("grid-pane");
         info.setHgap(8);
         info.setVgap(4);
+
+        // Prevent header truncation: make col 0 wide enough, col 1 grows
+        ColumnConstraints c0 = new ColumnConstraints();
+        c0.setMinWidth(90);               // enough for “Preferred Name”, “Created”, etc.
+        c0.setPrefWidth(110);
+        ColumnConstraints c1 = new ColumnConstraints();
+        c1.setHgrow(Priority.ALWAYS);
+        info.getColumnConstraints().setAll(c0, c1);
+
         int r = 0;
-        info.addRow(r++, new Label("Name:"), lblName);
-        info.addRow(r++, new Label("Preferred:"), lblPreferred);
-        info.addRow(r++, new Label("Team:"), lblTeam);
-        info.addRow(r++, new Label("Created:"), lblCreated);
-        info.addRow(r,   new Label("Updated:"), lblUpdated);
+        info.add(rowLabel("Preferred Name:"), 0, r); info.add(lblPreferred, 1, r++);
+        info.add(rowLabel("Team:"),            0, r); info.add(lblTeam,      1, r++);
+        info.add(rowLabel("Created:"),         0, r); info.add(lblCreated,   1, r++);
+        info.add(rowLabel("Updated:"),         0, r); info.add(lblUpdated,   1, r);
 
-        root.getChildren().addAll(top, info);
+        // Assemble
+        root.getChildren().setAll(lblSelector, selectorRow, info);
 
-        // initial disabled until swimmer selected
+        // Initial disable
         btnEdit.setDisable(true);
         btnDelete.setDisable(true);
+
+        // Handlers (edit/delete are stubs for now)
+        btnAdd.setOnAction(e -> onAddSwimmer());
+        btnEdit.setOnAction(e ->
+                new Alert(Alert.AlertType.INFORMATION, "Edit Swimmer (coming soon)").showAndWait());
+        btnDelete.setOnAction(e ->
+                new Alert(Alert.AlertType.INFORMATION, "Delete Swimmer (coming soon)").showAndWait());
+    }
+
+    private static Label rowLabel(String text) {
+        Label l = new Label(text);
+        l.getStyleClass().add("label-column-header");
+        return l;
     }
 
     // ---------------- State wiring ----------------
@@ -92,28 +121,35 @@ public final class SwimmerSection {
     private void wireState() {
         var app = AppState.get();
 
+        // Populate list
         cbSwimmer.setItems(app.getSwimmers());
 
-        // two-way sync
+        // Keep selection in sync (two-way)
         cbSwimmer.getSelectionModel().selectedItemProperty().addListener((o, oldV, s) -> {
-            if (s != null && s != app.getCurrentSwimmer()) app.setCurrentSwimmer(s);
+            if (s != null && s != app.getCurrentSwimmer()) {
+                app.setCurrentSwimmer(s);
+            }
         });
+
         app.currentSwimmerProperty().addListener((o, oldV, s) -> {
             if (s != cbSwimmer.getValue()) cbSwimmer.setValue(s);
             refreshDetails(s);
+            // Force a redraw so the button cell updates even if the same instance
+            cbSwimmer.setButtonCell(new ListCell<>() {
+                @Override protected void updateItem(Swimmer it, boolean empty) {
+                    super.updateItem(it, empty);
+                    setText(empty || it == null ? null : displayName(it));
+                }
+            });
         });
 
-        // initial selection
+        // Initial display
         if (app.getCurrentSwimmer() != null) {
             cbSwimmer.setValue(app.getCurrentSwimmer());
             refreshDetails(app.getCurrentSwimmer());
         } else if (!app.getSwimmers().isEmpty()) {
             cbSwimmer.getSelectionModel().selectFirst();
         }
-
-        // keep Edit/Delete disabled with no selection
-        btnEdit.disableProperty().bind(cbSwimmer.valueProperty().isNull());
-        btnDelete.disableProperty().bind(cbSwimmer.valueProperty().isNull());
     }
 
     // ---------------- Actions ----------------
@@ -129,11 +165,11 @@ public final class SwimmerSection {
         TextField tfTeam  = new TextField();
 
         GridPane gp = new GridPane();
-        gp.setHgap(8); gp.setVgap(8); gp.setPadding(new Insets(10));
-        gp.addRow(0, new Label("First:"), tfFirst);
-        gp.addRow(1, new Label("Last:"),  tfLast);
-        gp.addRow(2, new Label("Preferred:"), tfPref);
-        gp.addRow(3, new Label("Team:"), tfTeam);
+        gp.getStyleClass().add("grid-pane");
+        gp.addRow(0, rowLabel("First:"), tfFirst);
+        gp.addRow(1, rowLabel("Last:"),  tfLast);
+        gp.addRow(2, rowLabel("Preferred:"), tfPref);
+        gp.addRow(3, rowLabel("Team:"), tfTeam);
         dlg.getDialogPane().setContent(gp);
 
         Node ok = dlg.getDialogPane().lookupButton(ButtonType.OK);
@@ -165,38 +201,18 @@ public final class SwimmerSection {
 
     private void refreshDetails(Swimmer s) {
         boolean has = (s != null);
-        lblName.setText(has ? joinNonBlank(s.getFirstName(), s.getLastName()) : "—");
-        lblPreferred.setText(has && s.getPreferredName() != null && !s.getPreferredName().isBlank()
-                ? s.getPreferredName() : "—");
-        lblTeam.setText(has && s.getTeamName() != null && !s.getTeamName().isBlank()
-                ? s.getTeamName() : "—");
-        lblCreated.setText(has && s.getCreatedAt() != null ? s.getCreatedAt().toString() : "—");
-        lblUpdated.setText(has && s.getUpdatedAt() != null ? s.getUpdatedAt().toString() : "—");
+        btnEdit.setDisable(!has);
+        btnDelete.setDisable(!has);
+
+        lblPreferred.setText(has && notBlank(s.getPreferredName()) ? s.getPreferredName() : "—");
+        lblTeam.setText(has && notBlank(s.getTeamName()) ? s.getTeamName() : "—");
+        lblCreated.setText(has ? DateFmt.local(s.getCreatedAt()) : "—");
+        lblUpdated.setText(has ? DateFmt.local(s.getUpdatedAt()) : "—");
     }
 
     // ---------------- Helpers ----------------
 
-    private static Button makeIconButton(String iconName, String tooltip, Runnable action) {
-        Button b = new Button();
-        b.getStyleClass().add("icon-button");   // style in CSS
-        b.setMinSize(28, 28);
-        b.setPrefSize(28, 28);
-        b.setMaxSize(28, 28);
-
-        ImageView iv = null;
-        var url = SwimmerSection.class.getResource("/icons/" + iconName + ".png");
-        if (url != null) {
-            iv = new ImageView(new Image(url.toExternalForm(), 18, 18, true, true));
-        }
-        if (iv != null) b.setGraphic(iv); else b.setText("…"); // graceful fallback
-
-        if (tooltip != null && !tooltip.isBlank()) {
-            Tooltip.install(b, new Tooltip(tooltip));
-            b.setAccessibleText(tooltip);
-        }
-        if (action != null) b.setOnAction(e -> action.run());
-        return b;
-    }
+    private static boolean notBlank(String s) { return s != null && !s.isBlank(); }
 
     private static String displayName(Swimmer s) {
         if (s == null) return "";
@@ -206,13 +222,5 @@ public final class SwimmerSection {
         String left  = (preferred != null && !preferred.isBlank()) ? preferred :
                 (first != null ? first : "");
         return (left + ((last != null && !last.isBlank()) ? " " + last : "")).trim();
-    }
-
-    private static String joinNonBlank(String a, String b) {
-        a = a == null ? "" : a.trim();
-        b = b == null ? "" : b.trim();
-        if (a.isEmpty()) return b;
-        if (b.isEmpty()) return a;
-        return a + " " + b;
     }
 }

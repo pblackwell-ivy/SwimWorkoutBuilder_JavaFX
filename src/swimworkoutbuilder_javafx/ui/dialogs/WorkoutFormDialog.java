@@ -1,132 +1,131 @@
 package swimworkoutbuilder_javafx.ui.dialogs;
 
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.StringConverter;
 import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.model.enums.Course;
+import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.ui.Theme;
-import swimworkoutbuilder_javafx.ui.UiUtil;
 
-import java.net.URL;
-import java.util.Objects;
 import java.util.UUID;
 
-public class WorkoutFormDialog {
+/**
+ * Create or edit a Workout (name, course, notes).
+ * Reps belong to SetGroup, so the Workout dialog intentionally does NOT include reps.
+ */
+public final class WorkoutFormDialog {
+    private WorkoutFormDialog() {}
 
     /**
-     * @param swimmerId swimmer the workout belongs to
-     * @param initial   if non-null, dialog edits this workout in place
-     * @return the created/edited workout, or null if cancelled
+     * Show the dialog. If existing is null, creates a new Workout for swimmerId.
+     * Returns the created/edited Workout, or null if cancelled.
      */
-    public static Workout show(UUID swimmerId, Workout initial) {
+    public static Workout show(UUID swimmerId, Workout existing) {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
-        dialog.setTitle(initial == null ? "New Workout" : "Edit Workout");
+        dialog.setTitle(existing == null ? "New Workout" : "Edit Workout");
 
-        // Labels/controls
-        Label lblName = new Label("Name:");
+        // --- Fields --------------------------------------------------------
         TextField tfName = new TextField();
-
-        Label lblCourse = new Label("Course:");
+        tfName.setPromptText("Workout name (e.g., Main Threshold)");
         ChoiceBox<Course> cbCourse = new ChoiceBox<>();
-        cbCourse.getItems().addAll(Course.SCY, Course.SCM, Course.LCM);
-        cbCourse.setValue(Course.SCY);
+        cbCourse.getItems().setAll(Course.values());
 
-        Label lblNotes = new Label("Notes:");
+        // Plain labels for course, no multipliers
+        cbCourse.setConverter(new StringConverter<>() {
+            @Override public String toString(Course c) { return c == null ? "" : c.name(); }  // CHANGED: plain label
+            @Override public Course fromString(String s) { return Course.valueOf(s); }
+        });
+
         TextArea taNotes = new TextArea();
-        taNotes.setTextFormatter(UiUtil.maxLen(100));
-        taNotes.setPrefRowCount(8);
-        taNotes.setWrapText(true);
-        // QUIETER FORM LABELS (theme style)
-        lblName.getStyleClass().add("label-column-header");    // NEW
-        lblCourse.getStyleClass().add("label-column-header");  // NEW
-        lblNotes.getStyleClass().add("label-column-header");   // NEW
+        taNotes.setPromptText("Optional notes…");
+        taNotes.setPrefRowCount(3);
 
-        Button btnSave = new Button("Save");
-        Button btnCancel = new Button("Cancel");
-        btnSave.getStyleClass().addAll("button","primary");     // new
-        btnCancel.getStyleClass().addAll("button","secondary"); // new
-        btnSave.setDefaultButton(true);
-        btnCancel.setCancelButton(true);
-        btnSave.setMinWidth(90);
-        btnCancel.setMinWidth(90);
-
-        // Pre-fill on edit
-        if (initial != null) {
-            tfName.setText(initial.getName());
-            taNotes.setText(initial.getNotes() == null ? "" : initial.getNotes());
-            cbCourse.setValue(initial.getCourse());
+        // Prefill when editing
+        if (existing != null) {
+            tfName.setText(existing.getName());
+            cbCourse.setValue(existing.getCourse());
+            if (existing.getNotes() != null) taNotes.setText(existing.getNotes());
+        } else {
+            // Sensible defaults
+            cbCourse.getSelectionModel().select(Course.SCY);
         }
 
-        // Layout
-        GridPane gp = new GridPane();
-        gp.setHgap(10);
-        gp.setVgap(10);
-        gp.setPadding(new Insets(16));
+        // --- Buttons -------------------------------------------------------
+        Button btnSave = new Button("Save");
+        btnSave.getStyleClass().add("primary");
+        Button btnCancel = new Button("Cancel");
 
-        // THEMED FORM + CARD SURFACE
-        gp.getStyleClass().addAll("grid-pane", "surface");     // NEW
+        btnSave.setDefaultButton(true);
+        btnCancel.setCancelButton(true);
 
-        // Column sizing: labels fixed width, fields grow
-        ColumnConstraints c0 = new ColumnConstraints();
-        c0.setMinWidth(90);
-        c0.setPrefWidth(110);
-        ColumnConstraints c1 = new ColumnConstraints();
-        c1.setHgrow(Priority.ALWAYS);
-        gp.getColumnConstraints().addAll(c0, c1);
+        // --- Layout --------------------------------------------------------
+        GridPane form = new GridPane();
+        form.getStyleClass().add("grid-pane");
+        form.setHgap(8);
+        form.setVgap(8);
+        form.setPadding(new Insets(12));
 
-        // Rows
-        gp.add(lblName,   0, 0); gp.add(tfName,   1, 0);
-        gp.add(lblCourse, 0, 1); gp.add(cbCourse, 1, 1);
-        gp.add(lblNotes,  0, 2); gp.add(taNotes,  1, 2);
+        int r = 0;
+        form.addRow(r++, new Label("Name:"),   tfName);
+        form.addRow(r++, new Label("Course:"), cbCourse);
+        form.addRow(r++, new Label("Notes:"),  taNotes);
 
-        HBox buttons = new HBox(10, btnSave, btnCancel);
-        buttons.setAlignment(Pos.CENTER_RIGHT);
-        buttons.getStyleClass().add("toolbar");
-        gp.add(buttons, 1, 3);
+        BorderPane root = new BorderPane(form);
+        root.getStyleClass().add("surface");
+        ToolBar bar = new ToolBar(new Separator(), new Separator()); // keeps height tidy
+        // Use an HBox if you prefer right-aligned buttons:
+        var buttons = new javafx.scene.layout.HBox(10, btnCancel, btnSave);
+        buttons.setPadding(new Insets(10, 12, 12, 12));
+        buttons.setStyle("-fx-alignment: center-right;");
+        root.setBottom(buttons);
 
-        // Field growth
-        GridPane.setFillWidth(tfName, true);
-        tfName.setMaxWidth(Double.MAX_VALUE);
-        cbCourse.setMaxWidth(Double.MAX_VALUE);
-        taNotes.setMaxWidth(Double.MAX_VALUE);
+        Scene scene = new Scene(root, 460, 280);
+        Theme.apply(scene, WorkoutFormDialog.class);                // NEW: theme hook
+        dialog.setScene(scene);
 
         final Workout[] result = new Workout[1];
 
+        // --- Actions -------------------------------------------------------
         btnSave.setOnAction(e -> {
             String name = tfName.getText().trim();
+            Course course = cbCourse.getValue();
+            String notes = taNotes.getText().trim();
+
             if (name.isEmpty()) {
-                new Alert(Alert.AlertType.WARNING, "Workout name is required.").showAndWait();
+                new Alert(Alert.AlertType.WARNING, "Please enter a workout name.").showAndWait();
                 return;
             }
-            // Create or update in place
-            if (initial == null) {
-                Workout w = new Workout(swimmerId, name, cbCourse.getValue());
-                String notes = taNotes.getText();
-                if (notes != null && !notes.isBlank()) w.setNotes(notes);
+            if (course == null) {
+                new Alert(Alert.AlertType.WARNING, "Please choose a course.").showAndWait();
+                return;
+            }
+
+            if (existing == null) {
+                // Create brand-new workout
+                Workout w = new Workout(swimmerId, name, course, notes, /* default rest */ 60);
                 result[0] = w;
             } else {
-                initial.setName(name);
-                initial.setCourse(cbCourse.getValue());
-                String notes = taNotes.getText();
-                initial.setNotes((notes == null || notes.isBlank()) ? "" : notes);
-                result[0] = initial;
+                // Edit in place
+                existing.setName(name);
+                existing.setCourse(course);
+                existing.setNotes(notes);
+                result[0] = existing;
             }
             dialog.close();
         });
 
-        btnCancel.setOnAction(e -> { result[0] = null; dialog.close(); });
+        btnCancel.setOnAction(e -> {
+            result[0] = null;
+            dialog.close();
+        });
 
-        Scene scene = new Scene(gp, 520, 360);
-        Theme.apply(scene, WorkoutFormDialog.class);
-        dialog.setScene(scene);
-
-        dialog.setResizable(false);
         dialog.showAndWait();
         return result[0];
     }
