@@ -80,7 +80,18 @@ public final class LoadWorkoutDialog {
         });
 
         final Workout[] result = new Workout[1];
-        btnOpen.setOnAction(e -> { result[0] = list.getSelectionModel().getSelectedItem(); dialog.close(); });
+        btnOpen.setOnAction(e -> {
+            Workout sel = list.getSelectionModel().getSelectedItem();
+            if (sel == null) { result[0] = null; dialog.close(); return; }
+            try {
+                // IMPORTANT: fetch the full workout with groups/sets
+                result[0] = LocalStore.loadWorkout(sel.getId());
+            } catch (Exception ex) {
+                new Alert(Alert.AlertType.ERROR, "Unable to load workout: " + ex.getMessage()).showAndWait();
+                result[0] = null;
+            }
+            dialog.close();
+        });
         btnCancel.setOnAction(e -> { result[0] = null; dialog.close(); });
 
         BorderPane root = new BorderPane(list);

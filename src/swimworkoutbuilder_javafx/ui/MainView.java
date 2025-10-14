@@ -17,13 +17,15 @@ public final class MainView extends BorderPane {
 
     private final AppState app = AppState.get();
 
-    private final ActionBar actionBar = new ActionBar();
+
     private final SwimmerSection swimmerSection = new SwimmerSection();
     private final SeedGridPane seedGridPane = new SeedGridPane();
 
     private final WorkoutBuilderPresenter builderPresenter = new WorkoutBuilderPresenter(app);
     private final WorkoutHeaderPane headerPane = new WorkoutHeaderPane(app);
     private final WorkoutBuilderPane builderPane = new WorkoutBuilderPane(builderPresenter);
+    private final ActionBar actionBar = new ActionBar(builderPresenter); // ✅ passes presenter
+
 
     public MainView() {
         setTop(pad(actionBar.node(), 8, 12, 6, 12));

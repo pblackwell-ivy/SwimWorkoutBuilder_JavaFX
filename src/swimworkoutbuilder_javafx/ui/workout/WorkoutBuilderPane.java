@@ -65,10 +65,15 @@ public final class WorkoutBuilderPane {
     // Event Wiring
     // ---------------------------------------------------------------------
     private void wire() {
+        // EXISTING: listen for explicit refresh ticks (e.g., add/delete/move set)
         ReadOnlyIntegerProperty tick = presenter.refreshTickProperty();
         if (tick != null) {
             tick.addListener((obs, o, n) -> refresh());
         }
+
+        presenter.groups().addListener(
+                (javafx.collections.ListChangeListener<SetGroup>) change -> refresh()
+        );
     }
 
     // ---------------------------------------------------------------------

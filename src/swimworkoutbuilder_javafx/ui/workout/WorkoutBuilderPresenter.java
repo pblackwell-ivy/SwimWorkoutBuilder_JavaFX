@@ -3,42 +3,46 @@ package swimworkoutbuilder_javafx.ui.workout;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
 import swimworkoutbuilder_javafx.model.SetGroup;
 import swimworkoutbuilder_javafx.model.SwimSet;
 import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.model.units.Distance;
 import swimworkoutbuilder_javafx.state.AppState;
+import swimworkoutbuilder_javafx.store.LocalStore;
 
 public class WorkoutBuilderPresenter {
 
     private final AppState app;
 
-    // Exposed to the pane for rendering the current workout’s groups/sets
     private final ObservableList<SetGroup> groups = FXCollections.observableArrayList();
 
-    // Header stats (bound by WorkoutHeaderPane)
     private final StringProperty totalDistanceText = new SimpleStringProperty("-");
     private final StringProperty swimTimeText      = new SimpleStringProperty("-");
     private final StringProperty restTimeText      = new SimpleStringProperty("-");
     private final StringProperty durationText      = new SimpleStringProperty("-");
 
-    // Simple invalidation tick to refresh list cells that don’t observe nested changes
     private final IntegerProperty refreshTick = new SimpleIntegerProperty(0);
+
+    // NEW: track unsaved edits
+    private final BooleanProperty dirty = new SimpleBooleanProperty(false); // NEW
 
     public WorkoutBuilderPresenter(AppState app) {
         this.app = app;
 
-        // Initialize from current workout (if any)
         if (app.getCurrentWorkout() != null) {
             groups.setAll(app.getCurrentWorkout().getGroups());
             computeStats();
+            dirty.set(false); // NEW
         }
 
-        // Watch workout switches
         app.currentWorkoutProperty().addListener((obs, oldW, newW) -> {
             groups.clear();
             if (newW != null) groups.setAll(newW.getGroups());
             computeStats();
+            dirty.set(false); // NEW
         });
     }
 
@@ -52,6 +56,8 @@ public class WorkoutBuilderPresenter {
     public ReadOnlyStringProperty durationTextProperty()      { return durationText; }
 
     public IntegerProperty refreshTickProperty() { return refreshTick; }
+
+    public ReadOnlyBooleanProperty dirtyProperty() { return dirty; } // NEW
 
     public Workout getDisplayedWorkout() { return app.getCurrentWorkout(); }
 
@@ -148,10 +154,35 @@ public class WorkoutBuilderPresenter {
     }
 
     // ---------- Helpers ----------
+    public void loadFrom(Workout w) {
+        if (w == null || w.getGroups() == null) {
+            groups.clear();
+        } else {
+            groups.setAll(w.getGroups());
+        }
+        dirty.set(false);     // NEW
+        bumpRefresh();
+    }
+
+    public void commitTo(Workout w) throws IOException {
+        if (w == null) return;
+        w.getGroups().clear();
+        for (var g : groups) {
+            w.getGroups().add(new SetGroup(g));
+        }
+        w.setUpdatedAt(Instant.now());
+        LocalStore.saveWorkout(w);
+        dirty.set(false);     // NEW
+    }
+
+    private void bumpRefresh() {
+        try { refreshTick.set(refreshTick.get() + 1); } catch (Throwable ignored) {}
+    }
 
     private void touch() {
         computeStats();
         refreshTick.set(refreshTick.get() + 1);
+        dirty.set(true);      // NEW
     }
 
     private void computeStats() {
@@ -163,11 +194,8 @@ public class WorkoutBuilderPresenter {
             durationText.set("-");
             return;
         }
-
         Distance d = w.totalDistance();
         totalDistanceText.set(d.toShortString());
-
-        // If you later add time estimation hooks, populate these:
         swimTimeText.set("—");
         restTimeText.set("—");
         durationText.set("—");
