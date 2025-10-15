@@ -196,7 +196,7 @@ public final class ActionBar {
     }
 
     private void onAddSwimmer() {
-        // Minimal “new swimmer” dialog (same UX as SwimmerSection)
+        // Minimal “new swimmer” dialog (same UX as SwimmerPane)
         Dialog<Swimmer> dlg = new Dialog<>();
         dlg.setTitle("New Swimmer");
         dlg.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, ButtonType.OK);

@@ -1,6 +1,6 @@
 /* =========================================
    SwimWorkoutBuilder – Theme: Ocean Depth
-   (updated to match Aqua feature set)
+   (icon centering + danger icon fix)
    ========================================= */
 
 /* 0) TOKENS */
@@ -9,15 +9,15 @@
 
   -swim-bg:           #F5F7FA;
   -swim-surface:      #FFFFFF;
-  -swim-text:         #0F172A;   /* slate-900 */
-  -swim-text-weak:    #64748B;   /* slate-500/600 */
+  -swim-text:         #0F172A;
+  -swim-text-weak:    #64748B;
 
-  -swim-primary:      #0077B6;   /* pool blue */
-  -swim-primary-600:  #005A8D;   /* hover */
-  -swim-primary-700:  #004E7A;   /* pressed */
+  -swim-primary:      #0077B6;
+  -swim-primary-600:  #005A8D;
+  -swim-primary-700:  #004E7A;
 
-  -swim-secondary:    #4682B4;   /* steel/cerulean */
-  -swim-accent:       #00A2C7;   /* teal accent */
+  -swim-secondary:    #4682B4;
+  -swim-accent:       #00A2C7;
 
   -swim-success:      #16A34A;
   -swim-warning:      #F59E0B;
@@ -30,13 +30,13 @@
   -fx-faint-focus-color: rgba(102,179,255,0.22);
 }
 
-/* 1) GLOBAL TEXT */
+/* 1) TEXT */
 .label, .text { -fx-text-fill: -swim-text; -fx-font-size: 14px; }
 .muted { -fx-text-fill: -swim-text-weak; }
 .help  { -fx-text-fill: -swim-text-weak; -fx-font-size: 12px; }
 
 /* 2) SURFACES / FORMS */
-.surface, .grid-pane {
+.surface, .grid-pane, .card {
   -fx-background-color: -swim-surface;
   -fx-background-radius: 8px;
   -fx-padding: 12px;
@@ -44,18 +44,33 @@
   -fx-border-width: 1px;
   -fx-border-radius: 8px;
 }
+.form-grid {
+  -fx-hgap: 8;
+  -fx-vgap: 8;
+}
+.form-grid .label { -fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -swim-text-weak; -fx-opacity: .95;}
 .grid-pane { -fx-grid-lines-visible: false; -fx-hgap: 10px; -fx-vgap: 6px; }
+
+/* Column scroll containers (transparent background) */
+.scroll-pane.column-scroll {
+  -fx-background-color: transparent;
+  -fx-padding: 0;
+}
+.scroll-pane.column-scroll > .viewport {
+  -fx-background-color: transparent;
+}
+
+/* Column VBox (padding is theme-controlled) */
+.column-vbox {
+  -fx-padding: 12;
+}
+
+
 
 /* 3) HEADINGS */
 .label-header        { -fx-font-size: 22px; -fx-font-weight: 700; -fx-padding: 0 0 8px 0; }
 .section-title       { -fx-font-size: 18px; -fx-font-weight: 600; -fx-padding: 12px 0 6px 0; }
 .label-column-header { -fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -swim-text-weak; -fx-opacity: .95; }
-
-/* workout header bits */
-.workout-title { -fx-font-size: 16px; -fx-font-weight: 700; }
-.workout-notes { -fx-text-fill: -swim-text-weak; -fx-opacity: .9; }
-.metric-title  { -fx-font-size: 11px; -fx-text-fill: -swim-text-weak; }
-.metric-value  { -fx-font-size: 14px; -fx-font-weight: 600; }
 
 /* 4) INPUTS */
 .text-field, .password-field {
@@ -75,7 +90,7 @@
 }
 .seed-time-input { -fx-alignment: CENTER; }
 
-/* 5) BUTTONS */
+/* 5) BUTTONS — base */
 .button {
   -fx-background-radius: 8px;
   -fx-text-fill: white;
@@ -108,14 +123,21 @@
 }
 .button.ghost:hover { -fx-background-color: rgba(0,0,0,0.05); -fx-text-fill: -swim-text; }
 
-/* icon-only */
+/* icon-only (neutral) */
 .button.icon {
   -fx-background-color: transparent;
-  -fx-padding: 2px;
+  -fx-padding: 4px;
+  -fx-alignment: CENTER;
+  -fx-content-display: GRAPHIC_ONLY;
   -fx-min-width: 26px; -fx-min-height: 26px;
   -fx-max-width: 26px; -fx-max-height: 26px;
   -fx-text-fill: -swim-text-weak;
 }
+.button.icon > .image-view {  /* centers the ImageView */
+  -fx-translate-x: 0;
+  -fx-translate-y: 0;
+}
+.button.icon:disabled { -fx-opacity: .5; }
 .button.icon:hover { -fx-background-color: rgba(0,119,182,0.06); -fx-text-fill: -swim-text; }
 
 /* intents */
@@ -128,7 +150,7 @@
 .button.warn    { -fx-background-color: -swim-warning; }
 .button.warn:hover { -fx-background-color: derive(-swim-warning, -10%); }
 
-/* delete = outlined, muted */
+/* danger (outlined) */
 .button.danger {
   -fx-background-color: transparent;
   -fx-text-fill: #B24C4C;
@@ -139,7 +161,16 @@
 }
 .button.danger:hover { -fx-background-color: #F8E5E5; }
 
-/* compact variant */
+/* make danger role work for icon-only too */
+.button.danger.icon {
+  -fx-background-color: transparent;
+  -fx-text-fill: #B24C4C;
+  -fx-border-color: #E0A0A0;
+  -fx-border-width: 1px;
+}
+.button.danger.icon:hover { -fx-background-color: #F8E5E5; }
+
+/* compact */
 .button.sm {
   -fx-padding: 2px 8px;
   -fx-min-height: 24px;
@@ -154,7 +185,7 @@
 .row:hover { -fx-background-color: rgba(0,119,182,0.06); }
 .separator:horizontal .line { -fx-background-color: #EDF2F7; }
 
-/* 7) LABELS USED IN SETS */
+/* 7) SET LABELS */
 .label-setgroup-name { -fx-font-size: 15px; -fx-font-weight: 700; }
 .label-setgroup-rep  { -fx-font-size: 12px; -fx-text-fill: -swim-text-weak; }
 .label-setgroup-note { -fx-font-size: 12px; -fx-text-fill: -swim-text-weak; -fx-font-style: italic; }
@@ -167,7 +198,7 @@
 .label-set-interval  { -fx-font-size: 13px; -fx-text-fill: -swim-text-weak; }
 .label-set-goal      { -fx-font-size: 13px; -fx-text-fill: -swim-text-weak; }
 
-/* Effort chip */
+/* 8) CHIP */
 .chip {
   -fx-background-color: #EAF3FF;
   -fx-text-fill: -swim-primary;
@@ -179,16 +210,15 @@
   -fx-border-radius: 999;
 }
 
-/* 8) TOOLBAR */
+/* 9) TOOLBAR */
 .toolbar {
   -fx-background-color: -swim-surface;
-  -fx-padding: 6 8;             /* compact */
+  -fx-padding: 6 8;
   -fx-border-color: -swim-border;
   -fx-border-width: 0 0 1px 0;
 }
 
-/* === 9) SELECTS (ComboBox / ChoiceBox) ============================== */
-
+/* 10) SELECTS */
 .combo-box, .choice-box {
   -fx-background-color: -swim-surface;
   -fx-text-fill: -swim-text;
@@ -199,19 +229,11 @@
 }
 .combo-box > .list-cell,
 .combo-box > .text-field,
-.choice-box > .label {
-  -fx-padding: 4 10;
-  -fx-text-fill: -swim-text;
-}
+.choice-box > .label { -fx-padding: 4 10; -fx-text-fill: -swim-text; }
 .combo-box > .arrow-button,
-.choice-box > .open-button {
-  -fx-background-color: transparent;
-  -fx-padding: 0 8 0 6;
-}
+.choice-box > .open-button { -fx-background-color: transparent; -fx-padding: 0 8 0 6; }
 .combo-box > .arrow-button > .arrow,
-.choice-box > .open-button > .arrow {
-  -fx-background-color: -swim-secondary;
-}
+.choice-box > .open-button > .arrow { -fx-background-color: -swim-secondary; }
 
 /* focus/hover */
 .combo-box:focused, .choice-box:focused {

@@ -60,7 +60,7 @@ public class Main extends Application {
         Scene scene = new Scene(root, 1180, 720);
 
         // --- Load and apply stylesheet ---
-        var cssName = "styles-ocean-depth.css";
+        var cssName = "styles-ocean-depth-opt-b.css";
         var cssPathAndFile = "/swimworkoutbuilder_javafx/ui/" + cssName;
         var cssURL = Main.class.getResource(cssPathAndFile);
         if (cssURL != null) {

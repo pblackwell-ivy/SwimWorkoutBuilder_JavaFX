@@ -1,6 +1,5 @@
 package swimworkoutbuilder_javafx.ui.seeds;
 
-
 import java.util.EnumMap;
 import java.util.Map;
 import javafx.beans.binding.Bindings;
@@ -19,35 +18,13 @@ import swimworkoutbuilder_javafx.model.units.Distance;
 import swimworkoutbuilder_javafx.model.units.TimeSpan;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
-/**
- * [Pane] SeedGridPane for the "seeds" feature.
- *
- * <p><b>Responsibilities:</b>
- * <ul>
- *   <li>Initialize and layout UI nodes</li>
- *   <li>Bind controls to presenter/state properties</li>
- *   <li>Forward user interactions to the presenter</li>
- * </ul>
- *
- * <p><b>Design Notes:</b>
- * <ul>
- *   <li>FXML optional; keep business logic out of UI layer</li>
- *   <li>Co-locate with presenter for discoverability</li>
- *   <li>Encapsulate style classes/ids for theming</li>
- * </ul>
- *
- * <p><b>Usage Example:</b>
- * <pre>{@code
- * // Typical usage for SeedGridPane
- * SeedGridPane obj = new SeedGridPane();
- * obj.toString(); // replace with real usage
- * }</pre>
- *
- * @author Parker Blackwell
- * @version 1.0
- * @since 2025-10-14
- */
+import swimworkoutbuilder_javafx.ui.Icons;
 
+/**
+ * SeedGridPane — compact card showing/editing 100-distance seed times by stroke.
+ * View mode shows an edit icon; edit mode shows cancel/save icons.
+ * Buttons: ✎ (edit), ↩ (cancel), 💾 (save)
+ */
 public final class SeedGridPane extends BorderPane {
 
     // Displayed unit only (model stays canonical = per 100m)
@@ -56,7 +33,7 @@ public final class SeedGridPane extends BorderPane {
     private static final double YARD_TO_METER = 0.9144;
     private static final double METER_TO_YARD = 1.0 / 0.9144;
 
-    private final GridPane grid = new GridPane();
+    private final GridPane seedGrid = new GridPane();
     private final Label title = new Label("Seed Times");
 
     private final ToggleGroup unitGroup = new ToggleGroup();
@@ -64,10 +41,9 @@ public final class SeedGridPane extends BorderPane {
     private final RadioButton rbM  = new RadioButton("m");
     private final ObjectProperty<Unit> displayUnit = new SimpleObjectProperty<>(Unit.YD);
 
-    private final Button btnEdit = new Button("Edit");
-    private final Button btnSave = new Button("Save");
-    private final Button btnCancel = new Button("Cancel");
-
+    private final Button btnEdit = new Button("✎");
+    private final Button btnSave = new Button("💾");
+    private final Button btnCancel = new Button("↩");
 
     private final Map<StrokeType, TextField> fields = new EnumMap<>(StrokeType.class);
 
@@ -78,10 +54,11 @@ public final class SeedGridPane extends BorderPane {
     private Runnable onSeedsSaved;
 
     public SeedGridPane() {
+        getStyleClass().addAll("card", "compact");
+
         buildUI();
         initUnitsFromWorkout();
         wireState();
-        // Keep this pane in sync with AppState's current swimmer
         var app = AppState.get();
         bindSwimmer(app.getCurrentSwimmer()); // initial
         app.currentSwimmerProperty().addListener((obs, oldS, newS) -> bindSwimmer(newS));
@@ -97,64 +74,72 @@ public final class SeedGridPane extends BorderPane {
     public void setOnSeedsSaved(Runnable r) { this.onSeedsSaved = r; }
 
     private void buildUI() {
-        setPadding(new Insets(8));
+        setPadding(new Insets(6));
 
-        // Title
-        title.getStyleClass().add("section-title");
+        // — Title + actions in a single header row
+        title.getStyleClass().add("card-title");
 
-        // Units toggle (display-only)
+        btnEdit.getStyleClass().setAll("button", "secondary", "sm", "icon");
+        btnSave.getStyleClass().setAll("button", "primary",   "sm", "icon");
+        btnCancel.getStyleClass().setAll("button", "ghost",    "sm", "icon");
+
+        btnEdit.setGraphic(Icons.make("square-pen", 16));
+        btnSave.setGraphic(Icons.make("save", 16));
+        btnCancel.setGraphic(Icons.make("circle-x", 16));
+
+        // ensure small consistent square hit targets
+        for (Button b : new Button[]{btnEdit, btnCancel, btnSave}) {
+            b.setMinWidth(32); b.setPrefWidth(32);
+        }
+
+        btnEdit.setTooltip(new Tooltip("Edit seed times"));
+        btnSave.setTooltip(new Tooltip("Save seed times"));
+        btnCancel.setTooltip(new Tooltip("Cancel"));
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox header = new HBox(8, title, spacer, btnEdit, btnCancel, btnSave);
+        header.getStyleClass().add("card-header");
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        // — Units toggle directly under header
         rbYd.setToggleGroup(unitGroup);
         rbM.setToggleGroup(unitGroup);
         rbYd.setFocusTraversable(false);
         rbM.setFocusTraversable(false);
-
-        HBox unitBox = new HBox(6, new Label("Units:"), rbYd, rbM);
+        HBox unitBox = new HBox(4, new Label("Units:"), rbYd, rbM);
         unitBox.setAlignment(Pos.CENTER_LEFT);
 
-        // Grid
-        grid.setHgap(10);
-        grid.setVgap(6);
-        grid.setPadding(new Insets(6));
-
-        // Grid header row
+        // — Grid
+        seedGrid.getStyleClass().addAll("form-grid", "header-gap"); // header-gap = smaller top gap
+        // column headers
         Label colStroke = new Label("Stroke");
-        Label colTime = new Label();
+        Label colTime   = new Label();
+        colStroke.getStyleClass().setAll("table-column-header");
+        colTime.getStyleClass().setAll("table-column-header");
         colTime.textProperty().bind(Bindings.createStringBinding(
                 () -> "100 " + (displayUnit.get() == Unit.YD ? "yd" : "m") + " seed", displayUnit));
-        colStroke.getStyleClass().add("label-column-header");
-        colTime.getStyleClass().add("label-column-header");
 
-        grid.add(colStroke, 0, 0);
-        grid.add(colTime, 1, 0);
+        seedGrid.add(colStroke, 0, 0);
+        seedGrid.add(colTime,   1, 0);
         GridPane.setHalignment(colStroke, HPos.LEFT);
-        GridPane.setHalignment(colTime, HPos.CENTER);
+        GridPane.setHalignment(colTime,   HPos.CENTER);
 
-        btnEdit.getStyleClass().addAll("button", "primary");   // subtle outline gray-blue
-        btnSave.getStyleClass().addAll("button", "ghost");     // main action (blue)
-        btnCancel.getStyleClass().addAll("button", "ghost");     // quiet, transparent
-
-        // Add each stroke starting at row = 1
         int row = 1;
-        for (StrokeType st : StrokeType.values()) {
-            addRow(row++, st);
-        }
-        // Column sizing is compact as possible
-        ColumnConstraints c0 = new ColumnConstraints(); // label
-        ColumnConstraints c1 = new ColumnConstraints(); // input
+        for (StrokeType st : StrokeType.values()) addRow(row++, st);
+
+        ColumnConstraints c0 = new ColumnConstraints(); // labels
+        ColumnConstraints c1 = new ColumnConstraints(); // inputs
         c0.setHgrow(Priority.NEVER);
         c1.setHgrow(Priority.NEVER);
         c1.setHalignment(HPos.CENTER);
-        grid.getColumnConstraints().setAll(c0, c1);
+        seedGrid.getColumnConstraints().setAll(c0, c1);
 
-        HBox buttonBox = new HBox(8, btnEdit, btnSave, btnCancel);
-        buttonBox.setAlignment(Pos.CENTER_RIGHT);
-        buttonBox.setPadding(new Insets(6, 0, 0, 0));
-
-        // Root VBox (stack everything vertically)
-        VBox root = new VBox(8, buttonBox, title, unitBox, grid);
-        root.setFillWidth(false);   // grid keeps its compact width
-        root.setAlignment(Pos.TOP_CENTER);
-        setCenter(root);
+        // — Stack content vertically (no bottom button row needed anymore)
+        VBox content = new VBox(6, header, unitBox, seedGrid);
+        content.setFillWidth(false);
+        content.setAlignment(Pos.TOP_CENTER);
+        setCenter(content);
 
         // initial visual (bindings take over later)
         btnSave.setDisable(true);
@@ -164,27 +149,28 @@ public final class SeedGridPane extends BorderPane {
     // --- helper ---
     private static void setRoles(Button b, String... roles) {
         // keep "button" + role; remove previous role(s)
-        b.getStyleClass().removeAll("primary","secondary","ghost","success","danger","sm");
+        b.getStyleClass().removeAll("primary","secondary","ghost","success","danger","sm","icon");
         b.getStyleClass().add("button");
         b.getStyleClass().addAll(roles);
     }
 
     private void addRow(int row, StrokeType stroke) {
         var lbl = new Label(stroke.getLabel());
+        lbl.getStyleClass().add("table-row-label");
 
         var tf = new TextField();
         tf.setPromptText("m:ss.hh");
         tf.getStyleClass().add("seed-time-input");
         tf.setPrefColumnCount(6);
-        tf.setMaxWidth(60);
+        tf.setMaxWidth(54);
         tf.textProperty().addListener((o, a, b) -> {
             if (presenter.editingProperty().get()) presenter.markDirty();
         });
 
         fields.put(stroke, tf);
 
-        grid.add(lbl, 0, row);
-        grid.add(tf, 1, row);
+        seedGrid.add(lbl, 0, row);
+        seedGrid.add(tf, 1, row);
         GridPane.setHalignment(lbl, HPos.LEFT);
     }
 
@@ -223,16 +209,15 @@ public final class SeedGridPane extends BorderPane {
     }
 
     private void wireState() {
-        // this listener section is new
         presenter.editingProperty().addListener((obs, wasEditing, isEditing) -> {
             if (isEditing) {
-                setRoles(btnEdit, "ghost");     // fades while editing
-                setRoles(btnSave, "primary");   // main action
-                setRoles(btnCancel, "secondary");
+                setRoles(btnEdit, "ghost", "sm", "icon");     // fades while editing
+                setRoles(btnSave, "primary", "sm", "icon");   // main action
+                setRoles(btnCancel, "secondary", "sm", "icon");
             } else {
-                setRoles(btnEdit, "primary");   // back to single obvious action
-                setRoles(btnSave, "ghost");
-                setRoles(btnCancel, "ghost");
+                setRoles(btnEdit, "secondary", "sm", "icon"); // single action visible
+                setRoles(btnSave, "ghost", "sm", "icon");
+                setRoles(btnCancel, "ghost", "sm", "icon");
             }
         });
 
@@ -270,6 +255,14 @@ public final class SeedGridPane extends BorderPane {
         btnCancel.disableProperty().bind(
                 presenter.editingProperty().not()                 // Cancel only when editing
         );
+
+        // Visibility to match card: Edit in view; Cancel/Save in edit
+        btnEdit.visibleProperty().bind(presenter.editingProperty().not());
+        btnEdit.managedProperty().bind(btnEdit.visibleProperty());
+        btnSave.visibleProperty().bind(presenter.editingProperty());
+        btnSave.managedProperty().bind(btnSave.visibleProperty());
+        btnCancel.visibleProperty().bind(presenter.editingProperty());
+        btnCancel.managedProperty().bind(btnCancel.visibleProperty());
     }
 
     private void setEditable(boolean editable) {
@@ -343,31 +336,19 @@ public final class SeedGridPane extends BorderPane {
     /** Save as SeedPace(100m, canonicalTime) using Swimmer#setAllSeedPaces. */
     private boolean saveIntoSwimmer(Swimmer s) {
         try {
-            // Build a brand-new mutable map from the UI fields
             EnumMap<StrokeType, SeedPace> next = new EnumMap<>(StrokeType.class);
-
             for (var e : fields.entrySet()) {
                 StrokeType st = e.getKey();
                 String text = e.getValue().getText();
                 TimeSpan parsed = parseTime(text);
+                if (parsed == null) continue; // blank = clear
 
-                if (parsed == null) {
-                    // blank field = clear this seed
-                    continue;
-                }
-
-                // Convert display seconds (yd/m as chosen) -> canonical seconds (per 100m)
                 double dispSec   = parsed.toMillis() / 1000.0;
                 double canonSec  = convertDisplayToCanonicalSeconds(dispSec, displayUnit.get());
                 TimeSpan canonTs = TimeSpan.ofMillis(Math.round(canonSec * 1000.0));
-
-                // Store as “100 meters in canonTs”
                 next.put(st, new SeedPace(Distance.ofMeters(100), canonTs));
             }
-
-            // Atomically replace all seeds on the swimmer
             s.setAllSeedPaces(next);
-
             return true;
         } catch (Throwable t) {
             new Alert(Alert.AlertType.ERROR,
