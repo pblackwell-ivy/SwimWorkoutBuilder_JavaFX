@@ -1,5 +1,9 @@
 package swimworkoutbuilder_javafx.ui.preview;
 
+
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
@@ -8,10 +12,6 @@ import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.model.pacing.PacePolicy;
 import swimworkoutbuilder_javafx.model.utils.WorkoutPrinter;
 import swimworkoutbuilder_javafx.state.AppState;
-
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Presenter for the read-only Workout preview/print text.

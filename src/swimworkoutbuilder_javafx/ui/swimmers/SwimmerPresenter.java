@@ -1,14 +1,14 @@
 package swimworkoutbuilder_javafx.ui.swimmers;
 
+
+import java.util.Objects;
+import java.util.UUID;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
-
-import java.util.Objects;
-import java.util.UUID;
 
 /**
  * Presenter for creating/editing swimmers.

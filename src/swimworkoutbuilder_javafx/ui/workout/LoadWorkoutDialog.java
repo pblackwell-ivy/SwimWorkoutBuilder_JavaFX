@@ -1,5 +1,9 @@
-package swimworkoutbuilder_javafx.ui.dialogs;
+package swimworkoutbuilder_javafx.ui.workout;
 
+
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 import javafx.geometry.*;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -11,12 +15,34 @@ import javafx.stage.Stage;
 import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.store.LocalStore;
 import swimworkoutbuilder_javafx.ui.Theme;
-
-import java.net.URL;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+/**
+ * [Dialog] LoadWorkoutDialog for the "dialogs" feature.
+ *
+ * <p><b>Responsibilities:</b>
+ * <ul>
+ *   <li>Collect user input with clear primary/secondary actions</li>
+ *   <li>Validate inputs and surface errors accessibly</li>
+ *   <li>Return a result to the caller</li>
+ * </ul>
+ *
+ * <p><b>Design Notes:</b>
+ * <ul>
+ *   <li>Follows canonical roles (primary/secondary/tertiary/destructive)</li>
+ *   <li>ESC/Enter keys match platform expectations</li>
+ *   <li>Validation separated from presentation</li>
+ * </ul>
+ *
+ * <p><b>Usage Example:</b>
+ * <pre>{@code
+ * // Typical usage for LoadWorkoutDialog
+ * LoadWorkoutDialog obj = new LoadWorkoutDialog();
+ * obj.toString(); // replace with real usage
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version 1.0
+ * @since 2025-10-14
+ */
 
 public final class LoadWorkoutDialog {
 

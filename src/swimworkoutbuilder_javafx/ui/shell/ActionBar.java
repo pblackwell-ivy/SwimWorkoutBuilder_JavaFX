@@ -1,5 +1,7 @@
 package swimworkoutbuilder_javafx.ui.shell;
 
+
+import java.time.Instant;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.*;
@@ -8,9 +10,8 @@ import javafx.util.StringConverter;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
-import swimworkoutbuilder_javafx.ui.dialogs.LoadWorkoutDialog;
-
-import java.time.Instant;
+import swimworkoutbuilder_javafx.ui.workout.LoadWorkoutDialog;
+import swimworkoutbuilder_javafx.ui.workout.WorkoutFormDialog;
 
 /**
  * Top application toolbar.
@@ -162,7 +163,7 @@ public final class ActionBar {
                 new Alert(Alert.AlertType.INFORMATION, "Choose or create a swimmer first.").showAndWait();
                 return;
             }
-            var w = swimworkoutbuilder_javafx.ui.dialogs.WorkoutFormDialog.show(cur.getId(), null);
+            var w = WorkoutFormDialog.show(cur.getId(), null);
             if (w != null) {
                 try { LocalStore.saveWorkout(w); } catch (Exception ignored) {}
                 app.setCurrentWorkout(w);

@@ -1,5 +1,7 @@
 package swimworkoutbuilder_javafx.ui.workout;
 
+
+import java.util.Objects;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.geometry.Insets;
@@ -11,8 +13,6 @@ import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.model.enums.Course;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.ui.DateFmt;
-
-import java.util.Objects;
 
 /**
  * Workout header

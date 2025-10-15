@@ -1,9 +1,9 @@
 package swimworkoutbuilder_javafx.model.pacing;
 
-import swimworkoutbuilder_javafx.model.units.Distance;
-import swimworkoutbuilder_javafx.model.units.TimeSpan;
 
 import java.util.Objects;
+import swimworkoutbuilder_javafx.model.units.Distance;
+import swimworkoutbuilder_javafx.model.units.TimeSpan;
 
 /**
  * Represents a swimmer’s **baseline pace** (seed time) for a specific stroke and distance.

@@ -1,5 +1,8 @@
 package swimworkoutbuilder_javafx.ui.seeds;
 
+
+import java.util.EnumMap;
+import java.util.Map;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.*;
 import javafx.geometry.HPos;
@@ -16,9 +19,34 @@ import swimworkoutbuilder_javafx.model.units.Distance;
 import swimworkoutbuilder_javafx.model.units.TimeSpan;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
-
-import java.util.EnumMap;
-import java.util.Map;
+/**
+ * [Pane] SeedGridPane for the "seeds" feature.
+ *
+ * <p><b>Responsibilities:</b>
+ * <ul>
+ *   <li>Initialize and layout UI nodes</li>
+ *   <li>Bind controls to presenter/state properties</li>
+ *   <li>Forward user interactions to the presenter</li>
+ * </ul>
+ *
+ * <p><b>Design Notes:</b>
+ * <ul>
+ *   <li>FXML optional; keep business logic out of UI layer</li>
+ *   <li>Co-locate with presenter for discoverability</li>
+ *   <li>Encapsulate style classes/ids for theming</li>
+ * </ul>
+ *
+ * <p><b>Usage Example:</b>
+ * <pre>{@code
+ * // Typical usage for SeedGridPane
+ * SeedGridPane obj = new SeedGridPane();
+ * obj.toString(); // replace with real usage
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version 1.0
+ * @since 2025-10-14
+ */
 
 public final class SeedGridPane extends BorderPane {
 

@@ -1,19 +1,45 @@
-package swimworkoutbuilder_javafx.ui.dialogs;
+package swimworkoutbuilder_javafx.ui.swimmers;
 
+
+import java.util.Optional;
 import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
-import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.util.StringConverter;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.state.AppState;
-
-import java.util.Optional;
+/**
+ * [Dialog] ManageSwimmersDialog for the "dialogs" feature.
+ *
+ * <p><b>Responsibilities:</b>
+ * <ul>
+ *   <li>Collect user input with clear primary/secondary actions</li>
+ *   <li>Validate inputs and surface errors accessibly</li>
+ *   <li>Return a result to the caller</li>
+ * </ul>
+ *
+ * <p><b>Design Notes:</b>
+ * <ul>
+ *   <li>Follows canonical roles (primary/secondary/tertiary/destructive)</li>
+ *   <li>ESC/Enter keys match platform expectations</li>
+ *   <li>Validation separated from presentation</li>
+ * </ul>
+ *
+ * <p><b>Usage Example:</b>
+ * <pre>{@code
+ * // Typical usage for ManageSwimmersDialog
+ * ManageSwimmersDialog obj = new ManageSwimmersDialog();
+ * obj.toString(); // replace with real usage
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version 1.0
+ * @since 2025-10-14
+ */
 
 public final class ManageSwimmersDialog {
 

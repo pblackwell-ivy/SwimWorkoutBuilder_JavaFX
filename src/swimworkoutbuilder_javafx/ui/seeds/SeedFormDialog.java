@@ -1,5 +1,8 @@
-package swimworkoutbuilder_javafx.ui.dialogs;
+package swimworkoutbuilder_javafx.ui.seeds;
 
+
+import java.util.EnumMap;
+import java.util.Map;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -15,9 +18,34 @@ import swimworkoutbuilder_javafx.model.enums.StrokeType;
 import swimworkoutbuilder_javafx.model.pacing.SeedPace;
 import swimworkoutbuilder_javafx.model.units.Distance;
 import swimworkoutbuilder_javafx.model.units.TimeSpan;
-
-import java.util.EnumMap;
-import java.util.Map;
+/**
+ * [Dialog] SeedFormDialog for the "dialogs" feature.
+ *
+ * <p><b>Responsibilities:</b>
+ * <ul>
+ *   <li>Collect user input with clear primary/secondary actions</li>
+ *   <li>Validate inputs and surface errors accessibly</li>
+ *   <li>Return a result to the caller</li>
+ * </ul>
+ *
+ * <p><b>Design Notes:</b>
+ * <ul>
+ *   <li>Follows canonical roles (primary/secondary/tertiary/destructive)</li>
+ *   <li>ESC/Enter keys match platform expectations</li>
+ *   <li>Validation separated from presentation</li>
+ * </ul>
+ *
+ * <p><b>Usage Example:</b>
+ * <pre>{@code
+ * // Typical usage for SeedFormDialog
+ * SeedFormDialog obj = new SeedFormDialog();
+ * obj.toString(); // replace with real usage
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version 1.0
+ * @since 2025-10-14
+ */
 
 public class SeedFormDialog {
 

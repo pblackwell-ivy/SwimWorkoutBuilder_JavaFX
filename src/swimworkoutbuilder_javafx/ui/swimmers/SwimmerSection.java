@@ -1,5 +1,7 @@
 package swimworkoutbuilder_javafx.ui.swimmers;
 
+
+import java.util.Objects;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.*;
@@ -9,8 +11,34 @@ import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
 import swimworkoutbuilder_javafx.ui.DateFmt;
-
-import java.util.Objects;
+/**
+ * [UI Component] SwimmerSection for the "swimmers" feature.
+ *
+ * <p><b>Responsibilities:</b>
+ * <ul>
+ *   <li>Render nodes and bind to observable state</li>
+ *   <li>Expose minimal API for host containers</li>
+ *   <li>Integrate canonical button roles and theming</li>
+ * </ul>
+ *
+ * <p><b>Design Notes:</b>
+ * <ul>
+ *   <li>Encapsulate layout and styling concerns</li>
+ *   <li>Prefer composition over inheritance</li>
+ *   <li>Avoid side effects; pure UI behavior</li>
+ * </ul>
+ *
+ * <p><b>Usage Example:</b>
+ * <pre>{@code
+ * // Typical usage for SwimmerSection
+ * SwimmerSection obj = new SwimmerSection();
+ * obj.toString(); // replace with real usage
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version 1.0
+ * @since 2025-10-14
+ */
 
 public final class SwimmerSection {
 

@@ -3,14 +3,14 @@ package swimworkoutbuilder_javafx.model;
 // ------------------------------------------------------------
 // Imports
 // ------------------------------------------------------------
-import swimworkoutbuilder_javafx.model.enums.StrokeType;
-import swimworkoutbuilder_javafx.model.pacing.SeedPace;
-import swimworkoutbuilder_javafx.model.units.Distance;
-import swimworkoutbuilder_javafx.model.units.TimeSpan;
 
 import java.io.ObjectStreamException;
 import java.time.Instant;
 import java.util.*;
+import swimworkoutbuilder_javafx.model.enums.StrokeType;
+import swimworkoutbuilder_javafx.model.pacing.SeedPace;
+import swimworkoutbuilder_javafx.model.units.Distance;
+import swimworkoutbuilder_javafx.model.units.TimeSpan;
 
 /**
  * Represents an individual swimmer, including personal information,

@@ -1,5 +1,7 @@
-package swimworkoutbuilder_javafx.ui.dialogs;
+package swimworkoutbuilder_javafx.ui.workout;
 
+
+import java.util.UUID;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -10,10 +12,7 @@ import javafx.stage.Stage;
 import javafx.util.StringConverter;
 import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.model.enums.Course;
-import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.ui.Theme;
-
-import java.util.UUID;
 
 /**
  * Create or edit a Workout (name, course, notes).

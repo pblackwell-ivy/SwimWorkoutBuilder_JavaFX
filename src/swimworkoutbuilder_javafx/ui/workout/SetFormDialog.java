@@ -1,5 +1,7 @@
 package swimworkoutbuilder_javafx.ui.workout;
 
+
+import java.util.Optional;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -13,8 +15,6 @@ import swimworkoutbuilder_javafx.model.enums.Effort;
 import swimworkoutbuilder_javafx.model.enums.StrokeType;
 import swimworkoutbuilder_javafx.model.units.Distance;
 import swimworkoutbuilder_javafx.model.units.TimeSpan;
-
-import java.util.Optional;
 
 /**
  * Modal dialog for creating or editing a single {@link SwimSet}.

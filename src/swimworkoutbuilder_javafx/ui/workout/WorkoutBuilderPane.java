@@ -1,5 +1,8 @@
 package swimworkoutbuilder_javafx.ui.workout;
 
+
+import java.util.List;
+import java.util.Objects;
 import javafx.beans.property.ReadOnlyIntegerProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -9,9 +12,6 @@ import javafx.scene.layout.*;
 import swimworkoutbuilder_javafx.model.SetGroup;
 import swimworkoutbuilder_javafx.model.SwimSet;
 import swimworkoutbuilder_javafx.model.enums.Course;
-
-import java.util.List;
-import java.util.Objects;
 
 /**
  * Central “Workout Builder” pane.
@@ -48,7 +48,7 @@ public final class WorkoutBuilderPane {
         btnAddGroup.getStyleClass().addAll("button","primary"); // new
 
         btnAddGroup.setOnAction(e -> {                                              // CHANGED
-            swimworkoutbuilder_javafx.ui.dialogs.SetGroupFormDialog                    // NEW
+            SetGroupFormDialog                    // NEW
                     .show("Add Group", "New Group", 1, null)                             // NEW
                     .ifPresent(v -> presenter.addGroup(v.name, v.reps, v.notes));        // NEW
         });                                                                          // CHANGED

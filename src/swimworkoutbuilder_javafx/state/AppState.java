@@ -3,15 +3,15 @@ package swimworkoutbuilder_javafx.state;
 // ------------------------------------------------------------
 // Imports
 // ------------------------------------------------------------
+
+
+import java.io.Serializable;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.model.Workout;
-
-import java.io.Serializable;
 
 /**
  * Global observable state for the application (MVVM-ish “store”).

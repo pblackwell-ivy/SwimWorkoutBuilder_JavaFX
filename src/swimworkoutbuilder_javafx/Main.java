@@ -1,5 +1,7 @@
 package swimworkoutbuilder_javafx;
 
+
+import java.io.IOException;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.scene.Scene;
@@ -8,8 +10,6 @@ import javafx.stage.Stage;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
 import swimworkoutbuilder_javafx.ui.MainView;
-
-import java.io.IOException;
 
 /**
  * Entry point for the SwimWorkoutBuilder JavaFX application.
@@ -60,11 +60,13 @@ public class Main extends Application {
         Scene scene = new Scene(root, 1180, 720);
 
         // --- Load and apply stylesheet ---
-        var cssURL = Main.class.getResource("/swimworkoutbuilder_javafx/ui/styles.css");
+        var cssName = "styles-ocean-depth.css";
+        var cssPathAndFile = "/swimworkoutbuilder_javafx/ui/" + cssName;
+        var cssURL = Main.class.getResource(cssPathAndFile);
         if (cssURL != null) {
             scene.getStylesheets().add(cssURL.toExternalForm());
         } else {
-            System.err.println("WARNING: styles.css not found at /swimworkoutbuilder_javafx/ui/styles.css");
+            System.err.println("WARNING: " + cssName + " not found at " + cssPathAndFile);
         }
 
         // --- Stage setup ---

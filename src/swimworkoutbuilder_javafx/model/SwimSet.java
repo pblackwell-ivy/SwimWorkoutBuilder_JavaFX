@@ -3,17 +3,17 @@ package swimworkoutbuilder_javafx.model;
 // ------------------------------------------------------------
 // Imports
 // ------------------------------------------------------------
+
+import java.io.Serializable;
+import java.util.EnumSet;
+import java.util.Objects;
+import java.util.Set;
 import swimworkoutbuilder_javafx.model.enums.Course;
 import swimworkoutbuilder_javafx.model.enums.Effort;
 import swimworkoutbuilder_javafx.model.enums.Equipment;
 import swimworkoutbuilder_javafx.model.enums.StrokeType;
 import swimworkoutbuilder_javafx.model.units.Distance;
 import swimworkoutbuilder_javafx.model.units.TimeSpan;
-
-import java.io.Serializable;
-import java.util.EnumSet;
-import java.util.Objects;
-import java.util.Set;
 
 /**
  * One swim training set (leaf of the workout tree), e.g. “8×50 Free @ Threshold”.

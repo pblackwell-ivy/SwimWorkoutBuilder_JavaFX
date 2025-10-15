@@ -1,13 +1,13 @@
 package swimworkoutbuilder_javafx.model;
 
-import swimworkoutbuilder_javafx.model.enums.Course;
-import swimworkoutbuilder_javafx.model.units.Distance;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import swimworkoutbuilder_javafx.model.enums.Course;
+import swimworkoutbuilder_javafx.model.units.Distance;
 
 /**
  * Represents a structured swim workout for a specific swimmer.

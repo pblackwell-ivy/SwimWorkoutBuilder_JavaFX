@@ -1,5 +1,8 @@
 package swimworkoutbuilder_javafx.model.pacing;
 
+
+import java.util.Objects;
+import java.util.Set;
 import swimworkoutbuilder_javafx.model.SwimSet;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.model.Workout;
@@ -7,9 +10,6 @@ import swimworkoutbuilder_javafx.model.enums.DistanceFactors;
 import swimworkoutbuilder_javafx.model.enums.Effort;
 import swimworkoutbuilder_javafx.model.enums.Equipment;
 import swimworkoutbuilder_javafx.model.enums.StrokeType;
-
-import java.util.Objects;
-import java.util.Set;
 
 /**
  * Multiplier-based MVP policy for computing goal, interval, and rest.

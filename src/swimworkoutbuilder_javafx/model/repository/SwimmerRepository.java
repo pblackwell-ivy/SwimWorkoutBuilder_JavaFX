@@ -1,12 +1,12 @@
 package swimworkoutbuilder_javafx.model.repository;
 
-import swimworkoutbuilder_javafx.model.Swimmer;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import swimworkoutbuilder_javafx.model.Swimmer;
 
 /**
  * Repository for managing swimmers.

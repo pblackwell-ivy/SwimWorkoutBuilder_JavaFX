@@ -1,21 +1,49 @@
 package swimworkoutbuilder_javafx.ui.workout;
 
+import java.io.IOException;
+import java.io.IOException;
+import java.time.Instant;
+import java.time.Instant;
+import java.util.ArrayList;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import java.io.IOException;
-import java.time.Instant;
-import java.util.ArrayList;
 import swimworkoutbuilder_javafx.model.SetGroup;
 import swimworkoutbuilder_javafx.model.SwimSet;
 import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.model.enums.Course;
 import swimworkoutbuilder_javafx.model.units.Distance;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
-import swimworkoutbuilder_javafx.model.enums.Course;
-import java.time.Instant;
-import java.io.IOException;
 import swimworkoutbuilder_javafx.store.LocalStore;
+/**
+ * [Presenter] WorkoutBuilderPresenter for the "workout" feature.
+ *
+ * <p><b>Responsibilities:</b>
+ * <ul>
+ *   <li>Expose observable state to the view</li>
+ *   <li>Handle user intents and orchestrate updates</li>
+ *   <li>Coordinate with stores/services for data operations</li>
+ * </ul>
+ *
+ * <p><b>Design Notes:</b>
+ * <ul>
+ *   <li>Lightweight MVP (Presenter + Pane)</li>
+ *   <li>No blocking work on FX thread; delegate background tasks</li>
+ *   <li>Business logic lives in services/stores</li>
+ * </ul>
+ *
+ * <p><b>Usage Example:</b>
+ * <pre>{@code
+ * // Typical usage for WorkoutBuilderPresenter
+ * WorkoutBuilderPresenter obj = new WorkoutBuilderPresenter();
+ * obj.toString(); // replace with real usage
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version 1.0
+ * @since 2025-10-14
+ */
 
 
 public class WorkoutBuilderPresenter {

@@ -1,5 +1,7 @@
-package swimworkoutbuilder_javafx.ui.dialogs;
+package swimworkoutbuilder_javafx.ui.workout;
 
+
+import java.util.Optional;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -8,8 +10,6 @@ import javafx.scene.layout.GridPane;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import swimworkoutbuilder_javafx.ui.Theme;
-
-import java.util.Optional;
 
 /**
  * Create/Edit a workout SetGroup: name, reps, notes.

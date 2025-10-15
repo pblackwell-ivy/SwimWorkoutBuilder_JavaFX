@@ -7,6 +7,34 @@ import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.model.enums.Course;
 import swimworkoutbuilder_javafx.model.pacing.PacePolicy;
 import swimworkoutbuilder_javafx.model.units.Distance;
+/**
+ * [UI Component] WorkoutPrinter for the "utils" feature.
+ *
+ * <p><b>Responsibilities:</b>
+ * <ul>
+ *   <li>Render nodes and bind to observable state</li>
+ *   <li>Expose minimal API for host containers</li>
+ *   <li>Integrate canonical button roles and theming</li>
+ * </ul>
+ *
+ * <p><b>Design Notes:</b>
+ * <ul>
+ *   <li>Encapsulate layout and styling concerns</li>
+ *   <li>Prefer composition over inheritance</li>
+ *   <li>Avoid side effects; pure UI behavior</li>
+ * </ul>
+ *
+ * <p><b>Usage Example:</b>
+ * <pre>{@code
+ * // Typical usage for WorkoutPrinter
+ * WorkoutPrinter obj = new WorkoutPrinter();
+ * obj.toString(); // replace with real usage
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version 1.0
+ * @since 2025-10-14
+ */
 
 public final class WorkoutPrinter {
     private WorkoutPrinter() {}

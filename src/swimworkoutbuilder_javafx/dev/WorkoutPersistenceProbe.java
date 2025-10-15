@@ -1,13 +1,41 @@
 package swimworkoutbuilder_javafx.dev;
 
-import swimworkoutbuilder_javafx.model.*;
-import swimworkoutbuilder_javafx.model.enums.*;
-import swimworkoutbuilder_javafx.model.units.Distance;
-import swimworkoutbuilder_javafx.store.LocalStore;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import swimworkoutbuilder_javafx.model.*;
+import swimworkoutbuilder_javafx.model.enums.*;
+import swimworkoutbuilder_javafx.model.units.Distance;
+import swimworkoutbuilder_javafx.store.LocalStore;
+/**
+ * [UI Component] WorkoutPersistenceProbe for the "dev" feature.
+ *
+ * <p><b>Responsibilities:</b>
+ * <ul>
+ *   <li>Render nodes and bind to observable state</li>
+ *   <li>Expose minimal API for host containers</li>
+ *   <li>Integrate canonical button roles and theming</li>
+ * </ul>
+ *
+ * <p><b>Design Notes:</b>
+ * <ul>
+ *   <li>Encapsulate layout and styling concerns</li>
+ *   <li>Prefer composition over inheritance</li>
+ *   <li>Avoid side effects; pure UI behavior</li>
+ * </ul>
+ *
+ * <p><b>Usage Example:</b>
+ * <pre>{@code
+ * // Typical usage for WorkoutPersistenceProbe
+ * WorkoutPersistenceProbe obj = new WorkoutPersistenceProbe();
+ * obj.toString(); // replace with real usage
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version 1.0
+ * @since 2025-10-14
+ */
 
 public final class WorkoutPersistenceProbe {
     public static void main(String[] args) throws Exception {

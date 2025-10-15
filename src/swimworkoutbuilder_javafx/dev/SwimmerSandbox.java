@@ -1,5 +1,10 @@
-package swimworkoutbuilder_javafx.ui.swimmers;
+package swimworkoutbuilder_javafx.dev;
 
+
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.util.List;
 import javafx.application.Application;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -8,14 +13,11 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
-
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
-
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-import java.util.List;
+import swimworkoutbuilder_javafx.ui.swimmers.SwimmerPane;
+import swimworkoutbuilder_javafx.ui.swimmers.SwimmerPresenter;
 
 /**
  * Smoke test harness for SwimmerPane/SwimmerPresenter that adapts

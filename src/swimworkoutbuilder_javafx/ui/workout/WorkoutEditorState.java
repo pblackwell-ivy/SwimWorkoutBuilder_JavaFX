@@ -1,11 +1,11 @@
 package swimworkoutbuilder_javafx.ui.workout;
 
+
+import java.util.Objects;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import swimworkoutbuilder_javafx.model.Workout;
-
-import java.util.Objects;
 
 /**
  * Minimal editing state holder for a Workout.
