@@ -11,6 +11,8 @@ import swimworkoutbuilder_javafx.ui.swimmers.SwimmerPane;
 import swimworkoutbuilder_javafx.ui.workout.WorkoutBuilderPane;
 import swimworkoutbuilder_javafx.ui.workout.WorkoutBuilderPresenter;
 import swimworkoutbuilder_javafx.ui.workout.WorkoutHeaderPane;
+import swimworkoutbuilder_javafx.ui.workout.WorkoutPane;
+
 /**
  * [UI Component] MainView for the "swimworkoutbuilder_javafx" feature.
  *
@@ -50,8 +52,9 @@ public final class MainView extends BorderPane {
     private final WorkoutBuilderPresenter builderPresenter = new WorkoutBuilderPresenter(app);
     private final WorkoutHeaderPane headerPane = new WorkoutHeaderPane(app);
     private final WorkoutBuilderPane builderPane = new WorkoutBuilderPane(builderPresenter);
-    private final ActionBar actionBar = new ActionBar(); // ✅ passes presenter
+    private final ActionBar actionBar = new ActionBar();
 
+    private final WorkoutPane workoutPane = new WorkoutPane();
 
     public MainView() {
         setTop(pad(actionBar.node(), 8, 12, 6, 12));
@@ -62,11 +65,9 @@ public final class MainView extends BorderPane {
         leftColumn.setPrefWidth(300);
         setLeft(leftColumn);
 
-        // CENTER: Workout header + builder
+        // CENTER: wrapper sheet + scrollable workout column
         VBox centerColumn = new VBox(12, headerPane.node(), builderPane.node());
         centerColumn.getStyleClass().add("column-sheet");
-        VBox.setVgrow(builderPane.node(), Priority.ALWAYS);
-        centerColumn.setPadding(new Insets(8));
         setCenter(centerColumn);
 
         headerPane.bindPresenter(builderPresenter); // forces live header update when groups/sets change

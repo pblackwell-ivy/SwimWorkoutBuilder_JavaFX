@@ -1,106 +1,97 @@
 package swimworkoutbuilder_javafx.ui.workout;
 
-
-import java.util.Optional;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
-import javafx.stage.Modality;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.stage.Stage;
-import swimworkoutbuilder_javafx.ui.Theme;
+import swimworkoutbuilder_javafx.model.SetGroup;
+import swimworkoutbuilder_javafx.ui.UiUtil;
+import swimworkoutbuilder_javafx.ui.common.DialogUtil;
 
-/**
- * Create/Edit a workout SetGroup: name, reps, notes.
- * (Reps belong to groups, not workouts.)
- */
-public final class SetGroupFormDialog { // NEW: entire file
-    private SetGroupFormDialog() {}     // NEW
+public final class SetGroupFormDialog {
+    private SetGroupFormDialog() { }
 
-    /** NEW: Simple return type so the caller can pass values to the presenter. */
-    public static final class Values { // NEW
-        public final String name;     // NEW
-        public final int reps;        // NEW
-        public final String notes;    // NEW
-        public Values(String name, int reps, String notes) { // NEW
-            this.name = name; this.reps = reps; this.notes = notes; // NEW
-        } // NEW
-    } // NEW
+    public static SetGroup show(SetGroup initial) {
+        Stage dialog = new Stage();
 
-    /**
-     * NEW: Show a modal dialog and return values if user presses Save.
-     * @param title dialog title (e.g., "Add Group" or "Edit Group")
-     * @param initialName prefill for name (nullable)
-     * @param initialReps prefill for reps (>=1), use 1 if null
-     * @param initialNotes prefill for notes (nullable)
-     */
-    public static Optional<Values> show(String title, String initialName, Integer initialReps, String initialNotes) { // NEW
-        Stage dialog = new Stage();                                  // NEW
-        dialog.initModality(Modality.APPLICATION_MODAL);             // NEW
-        dialog.setTitle(title == null ? "Group" : title);            // NEW
+        Label lblName = new Label("Group name:");
+        TextField tfName = new TextField();
+        tfName.setPromptText("e.g., Warmup, Main, Cooldown");
+        tfName.setTextFormatter(UiUtil.maxLen(60));
 
-        TextField tfName = new TextField();                          // NEW
-        tfName.setPromptText("Group name (e.g., Warmup, Main)");     // NEW
+        Label lblReps = new Label("Repetitions:");
+        Spinner<Integer> spReps = new Spinner<>(1, 99, 1);
+        spReps.setEditable(true);
+        spReps.setPrefWidth(80);
 
-        Spinner<Integer> spReps = new Spinner<>(1, 99, 1);           // NEW
-        spReps.setEditable(true);                                    // NEW
+        Label lblNote = new Label("Note:");
+        TextField tfNote = new TextField();
+        tfNote.setPromptText("optional");
+        tfNote.setTextFormatter(UiUtil.maxLen(100));
 
-        TextArea taNotes = new TextArea();                           // NEW
-        taNotes.setPromptText("Optional notes…");                    // NEW
-        taNotes.setPrefRowCount(2);                                  // NEW
+        if (initial != null) {
+            tfName.setText(initial.getName());
+            spReps.getValueFactory().setValue(Math.max(1, initial.getReps()));
+            tfNote.setText(initial.getNotes()==null? "" : initial.getNotes());
+        }
 
-        // Prefill (NEW)
-        if (initialName != null) tfName.setText(initialName);        // NEW
-        spReps.getValueFactory().setValue(initialReps == null ? 1 : Math.max(1, initialReps)); // NEW
-        if (initialNotes != null) taNotes.setText(initialNotes);     // NEW
+        Button btnSave = new Button("Save");
+        Button btnCancel = new Button("Cancel");
+        btnSave.getStyleClass().addAll("button","primary");
+        btnCancel.getStyleClass().addAll("button","secondary");
+        btnSave.setDefaultButton(true);
+        btnCancel.setCancelButton(true);
 
-        // Buttons (NEW)
-        Button btnSave = new Button("Save");                         // NEW
-        btnSave.getStyleClass().add("primary");                      // NEW
-        Button btnCancel = new Button("Cancel");                     // NEW
-        btnSave.setDefaultButton(true);                              // NEW
-        btnCancel.setCancelButton(true);                             // NEW
+        final SetGroup[] out = new SetGroup[1];
+        btnSave.setOnAction(e -> {
+            String name = tfName.getText()==null? "" : tfName.getText().trim();
+            if (name.isEmpty()) {
+                new Alert(Alert.AlertType.WARNING, "Group name is required.").showAndWait();
+                return;
+            }
+            int reps = spReps.getValue();
+            String note = tfNote.getText() == null ? "" : tfNote.getText().trim();
+            if (initial == null) {
+                SetGroup sg = new SetGroup(name);
+                sg.setReps(reps);
+                sg.setNotes(note);
+                out[0] = sg;
+            } else {
+                initial.setName(name);
+                initial.setReps(reps);
+                initial.setNotes(note);
+                out[0] = initial;
+            }
+            dialog.close();
+        });
+        btnCancel.setOnAction(e -> { out[0] = null; dialog.close(); });
 
-        // Layout (NEW)
-        GridPane form = new GridPane();                              // NEW
-        form.getStyleClass().add("grid-pane");                       // NEW
-        form.setHgap(8); form.setVgap(8); form.setPadding(new Insets(12)); // NEW
-        int r = 0;                                                   // NEW
-        form.addRow(r++, new Label("Name:"), tfName);                // NEW
-        form.addRow(r++, new Label("Reps:"), spReps);                // NEW
-        form.addRow(r++, new Label("Notes:"), taNotes);              // NEW
+        GridPane gp = new GridPane();
+        gp.getStyleClass().add("form-grid");
+        gp.setPadding(new Insets(12));
 
-        BorderPane root = new BorderPane(form);                      // NEW
-        root.getStyleClass().add("surface");                         // NEW
-        var buttons = new javafx.scene.layout.HBox(10, btnCancel, btnSave); // NEW
-        buttons.setPadding(new Insets(10, 12, 12, 12));              // NEW
-        buttons.setStyle("-fx-alignment: center-right;");            // NEW
-        root.setBottom(buttons);                                     // NEW
+        ColumnConstraints c0 = new ColumnConstraints();
+        c0.setMinWidth(110);
+        ColumnConstraints c1 = new ColumnConstraints();
+        c1.setHgrow(Priority.ALWAYS);
+        gp.getColumnConstraints().addAll(c0,c1);
 
-        Scene scene = new Scene(root, 420, 260);                     // NEW
-        Theme.apply(scene, SetGroupFormDialog.class);                   // NEW
-        dialog.setScene(scene);                                      // NEW
+        gp.add(lblName, 0, 0); gp.add(tfName, 1, 0);
+        gp.add(lblReps, 0, 1); gp.add(spReps, 1, 1);
+        gp.add(lblNote, 0, 2); gp.add(tfNote, 1, 2);
 
-        final Values[] out = new Values[1];                          // NEW
+        HBox buttons = new HBox(10, btnCancel, btnSave);
+        buttons.setAlignment(Pos.CENTER_RIGHT);
+        gp.add(buttons, 1, 3);
 
-        btnSave.setOnAction(e -> {                                   // NEW
-            String name = tfName.getText().trim();                   // NEW
-            if (name.isEmpty()) {                                    // NEW
-                new Alert(Alert.AlertType.WARNING, "Please enter a group name.").showAndWait(); // NEW
-                return;                                              // NEW
-            }                                                        // NEW
-            int reps;                                                // NEW
-            try { reps = Integer.parseInt(spReps.getEditor().getText().trim()); } // NEW
-            catch (Exception ex) { reps = spReps.getValue(); }       // NEW
-            reps = Math.max(1, reps);                                // NEW
-            String notes = taNotes.getText().trim();                 // NEW
-            out[0] = new Values(name, reps, notes.isEmpty() ? null : notes); // NEW
-            dialog.close();                                          // NEW
-        });                                                          // NEW
-
-        btnCancel.setOnAction(e -> { out[0] = null; dialog.close(); }); // NEW
-        dialog.showAndWait();                                        // NEW
-        return Optional.ofNullable(out[0]);                          // NEW
-    }                                                                 // NEW
+        Scene scene = new Scene(gp, 460, 240);
+        DialogUtil.prime(dialog, scene, null, 460, 240, (initial==null? "Add Group" : "Edit Group"));
+        dialog.showAndWait();
+        return out[0];
+    }
 }

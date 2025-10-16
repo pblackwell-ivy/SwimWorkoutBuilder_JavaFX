@@ -1,180 +1,218 @@
 package swimworkoutbuilder_javafx.ui.workout;
 
-
-import java.util.Optional;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
+import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.model.SwimSet;
-import swimworkoutbuilder_javafx.model.enums.Course;
-import swimworkoutbuilder_javafx.model.enums.Effort;
-import swimworkoutbuilder_javafx.model.enums.StrokeType;
+import swimworkoutbuilder_javafx.model.enums.*;
 import swimworkoutbuilder_javafx.model.units.Distance;
-import swimworkoutbuilder_javafx.model.units.TimeSpan;
+import swimworkoutbuilder_javafx.state.AppState;
+import swimworkoutbuilder_javafx.model.pacing.DefaultPacePolicy;
+import swimworkoutbuilder_javafx.model.pacing.PacePolicy;
+import swimworkoutbuilder_javafx.ui.common.DialogUtil;
 
-/**
- * Modal dialog for creating or editing a single {@link SwimSet}.
- *
- * <p><b>Responsibilities:</b></p>
- * <ul>
- *   <li>Displays a form for reps, distance, stroke, effort, course, goal time, and notes.</li>
- *   <li>Parses user input into a {@link SwimSet} object.</li>
- *   <li>Handles both “add” and “edit” modes with prefilled values when applicable.</li>
- * </ul>
- *
- * <p><b>Design Notes:</b></p>
- * <ul>
- *   <li>Implements a static {@code show()} method for simple, modal use.</li>
- *   <li>Follows MVP: the dialog is a dumb view returning a domain object.</li>
- *   <li>Local helper {@code parseFlexible()} handles time formats like “1:05.23” or “45.8”.</li>
- * </ul>
- *
- * @author Parker Blackwell
- * @version 1.0
- * @since 2025-10-13
- * @see SwimSet
- * @see WorkoutBuilderPane
- */
+import java.util.EnumSet;
+
 public final class SetFormDialog {
+    private SetFormDialog() { }
 
-    private SetFormDialog() {}
-
-    /**
-     * Shows a blocking modal dialog for editing or creating a SwimSet.
-     * @param existing may be null (new set) or an existing set to edit
-     * @return Optional of new SwimSet if user pressed Save; empty if cancelled
-     */
-    public static Optional<SwimSet> show(SwimSet existing) {
+    /** Redesigned dialog: compact multi-row layout with live interval/goal. */
+    public static SwimSet show(Workout workout, SwimSet existing) {
         Stage dialog = new Stage();
-        dialog.initModality(Modality.APPLICATION_MODAL);
-        dialog.setTitle(existing == null ? "Add Set" : "Edit Set");
 
-        // --- Controls ------------------------------------------------------
-        TextField tfReps = new TextField("1");
-        TextField tfDist = new TextField("50");
+        // Row 1: reps × distance
+        Spinner<Integer> spReps = new Spinner<>(1, 999, 1);
+        spReps.setEditable(true);
+        spReps.setPrefWidth(90);
 
-        ChoiceBox<StrokeType> cbStroke = new ChoiceBox<>();
-        cbStroke.getItems().setAll(StrokeType.values());
-        cbStroke.getSelectionModel().select(StrokeType.FREESTYLE);
+        Course course = workout != null ? workout.getCourse() : Course.SCY;
+        boolean isYards = (course == Course.SCY);
+        boolean isMeters = (course == Course.SCM || course == Course.LCM);
+        int lap = (int)Math.round(isYards ? course.getLength().toYards() : course.getLength().toMeters());
 
-        ChoiceBox<Effort> cbEffort = new ChoiceBox<>();
-        cbEffort.getItems().setAll(Effort.values());
-        cbEffort.getSelectionModel().select(Effort.EASY);
+        Spinner<Integer> spDist = new Spinner<>(lap, 2000, 100, lap);
+        spDist.setEditable(true);
+        spDist.setPrefWidth(110);
 
-        ChoiceBox<Course> cbCourse = new ChoiceBox<>();
-        cbCourse.getItems().setAll(Course.values());
-        cbCourse.getSelectionModel().select(Course.SCY);
+        HBox row1 = new HBox(8,
+                new Label("Reps:"), spReps,
+                new Label("×"),
+                new Label("Distance/rep:"), spDist, new Label(isYards ? "yd" : "m"));
+        row1.setAlignment(Pos.CENTER_LEFT);
 
-        TextField tfGoal = new TextField("");  // optional goal time
-        TextArea taNotes = new TextArea();
-        taNotes.setPrefRowCount(2);
-
-        // Prefill from existing
-        if (existing != null) {
-            tfReps.setText(String.valueOf(existing.getReps()));
-            tfDist.setText(String.valueOf(Math.round(existing.getDistancePerRep().toYards())));
-            if (existing.getStroke() != null) cbStroke.setValue(existing.getStroke());
-            if (existing.getEffort() != null) cbEffort.setValue(existing.getEffort());
-            if (existing.getCourse() != null) cbCourse.setValue(existing.getCourse());
-            if (existing.getGoalTime() != null) tfGoal.setText(existing.getGoalTime().toString());
-            if (existing.getNotes() != null) taNotes.setText(existing.getNotes());
+        // Row 2: stroke radios
+        ToggleGroup strokeGroup = new ToggleGroup();
+        FlowPane strokeFlow = new FlowPane(8, 6);
+        for (StrokeType st : StrokeType.values()) {
+            RadioButton rb = new RadioButton(st.getLabel());
+            rb.setUserData(st);
+            rb.setToggleGroup(strokeGroup);
+            strokeFlow.getChildren().add(rb);
         }
+        VBox row2 = new VBox(new Label("Stroke:"), strokeFlow);
+
+        // Row 3: interval + goal (read-only)
+        TextField tfInterval = new TextField(); tfInterval.setEditable(false);
+        TextField tfGoal     = new TextField(); tfGoal.setEditable(false);
+        HBox row3 = new HBox(8, new Label("Interval (@):"), tfInterval, new Label("Goal:"), tfGoal);
+        row3.setAlignment(Pos.CENTER_LEFT);
+
+        // Row 4: effort radios
+        ToggleGroup effortGroup = new ToggleGroup();
+        HBox effortRow = new HBox(10);
+        for (Effort e : Effort.values()) {
+            RadioButton rb = new RadioButton(e.name());
+            rb.setUserData(e);
+            rb.setToggleGroup(effortGroup);
+            effortRow.getChildren().add(rb);
+        }
+        VBox row4 = new VBox(new Label("Effort:"), effortRow);
+
+        // Row 5: equipment toggle chips
+        FlowPane eqFlow = new FlowPane(8, 6);
+        EnumSet<Equipment> eqSelected = EnumSet.noneOf(Equipment.class);
+        for (Equipment eq : Equipment.values()) {
+            ToggleButton b = new ToggleButton(eq.getLabel());
+            b.getStyleClass().addAll("button","ghost","sm");
+            b.setUserData(eq);
+            b.setOnAction(ev -> {
+                Equipment e = (Equipment) b.getUserData();
+                if (b.isSelected()) eqSelected.add(e); else eqSelected.remove(e);
+            });
+            eqFlow.getChildren().add(b);
+        }
+        VBox row5 = new VBox(new Label("Equipment:"), eqFlow);
+
+        // Prefill on edit
+        if (existing != null) {
+            spReps.getValueFactory().setValue(Math.max(1, existing.getReps()));
+            int disp = isYards ? (int) Math.round(existing.getDistancePerRep().toYards())
+                               : (int) Math.round(existing.getDistancePerRep().toMeters());
+            spDist.getValueFactory().setValue(disp);
+            if (existing.getStroke() != null) {
+                for (var n : strokeFlow.getChildren()) {
+                    RadioButton rb = (RadioButton)n;
+                    if (rb.getUserData() == existing.getStroke()) { rb.setSelected(true); break; }
+                }
+            }
+            if (existing.getEffort() != null) {
+                for (var n : effortRow.getChildren()) {
+                    RadioButton rb = (RadioButton)n;
+                    if (rb.getUserData() == existing.getEffort()) { rb.setSelected(true); break; }
+                }
+            }
+            if (existing.getEquipment() != null) {
+                for (var n : eqFlow.getChildren()) {
+                    ToggleButton b = (ToggleButton)n;
+                    if (existing.getEquipment().contains((Equipment)b.getUserData())) b.setSelected(true);
+                }
+                eqSelected.addAll(existing.getEquipment());
+            }
+        } else {
+            spReps.getValueFactory().setValue(1);
+            spDist.getValueFactory().setValue(100);
+            for (var n : strokeFlow.getChildren()) { // default Free
+                RadioButton rb = (RadioButton)n;
+                if (rb.getText().toLowerCase().contains("free")) { rb.setSelected(true); break; }
+            }
+            for (var n : effortRow.getChildren()) {
+                RadioButton rb = (RadioButton)n;
+                if (rb.getText().equalsIgnoreCase("EASY")) { rb.setSelected(true); break; }
+            }
+        }
+
+        // live calculation
+        Runnable recalc = () -> {
+            SwimSet tmp = new SwimSet();
+            tmp.setReps(spReps.getValue());
+            int val = spDist.getValue();
+            Distance dpr = isYards ? Distance.ofYards(val) : Distance.ofMeters(val);
+            tmp.setDistancePerRep(dpr);
+
+            var stToggle = strokeGroup.getSelectedToggle();
+            var efToggle = effortGroup.getSelectedToggle();
+            if (stToggle != null) tmp.setStroke((StrokeType)((RadioButton)stToggle).getUserData());
+            if (efToggle != null) tmp.setEffort((Effort)((RadioButton)efToggle).getUserData());
+            tmp.setEquipment(eqSelected);
+
+            var swimmer = AppState.get().getCurrentSwimmer();
+            PacePolicy policy = new DefaultPacePolicy();
+
+            if (swimmer == null || tmp.getStroke() == null) { 
+                tfInterval.setText(""); tfGoal.setText(""); return; 
+            }
+
+            double goalSec = policy.goalSeconds(workout, tmp, swimmer, 1);
+            int intervalSec = policy.intervalSeconds(workout, tmp, swimmer, 1);
+            tfGoal.setText(mmss(goalSec));
+            tfInterval.setText(mmss(intervalSec));
+        };
+
+        spReps.valueProperty().addListener((o,a,b)->recalc.run());
+        spDist.valueProperty().addListener((o,a,b)->recalc.run());
+        strokeGroup.selectedToggleProperty().addListener((o,a,b)->recalc.run());
+        effortGroup.selectedToggleProperty().addListener((o,a,b)->recalc.run());
+        for (var n : eqFlow.getChildren()) ((ToggleButton)n).selectedProperty().addListener((o,a,b)->recalc.run());
 
         Button btnSave = new Button("Save");
         Button btnCancel = new Button("Cancel");
+        btnSave.getStyleClass().addAll("button","primary");
+        btnCancel.getStyleClass().addAll("button","secondary");
         btnSave.setDefaultButton(true);
         btnCancel.setCancelButton(true);
 
-        // --- Layout --------------------------------------------------------
-        GridPane form = new GridPane();
-        form.setHgap(8);
-        form.setVgap(8);
-        form.setPadding(new Insets(12));
-        int r = 0;
-        form.addRow(r++, new Label("Reps:"), tfReps);
-        form.addRow(r++, new Label("Distance (yd):"), tfDist);
-        form.addRow(r++, new Label("Stroke:"), cbStroke);
-        form.addRow(r++, new Label("Effort:"), cbEffort);
-        form.addRow(r++, new Label("Course:"), cbCourse);
-        form.addRow(r++, new Label("Goal Time (optional):"), tfGoal);
-        form.addRow(r++, new Label("Notes:"), taNotes);
-
-        HBox buttons = new HBox(10, btnCancel, btnSave);
-        buttons.setAlignment(Pos.CENTER_RIGHT);
-        buttons.setPadding(new Insets(10, 12, 12, 12));
-
-        BorderPane root = new BorderPane(form);
-        root.setBottom(buttons);
-
-        dialog.setScene(new Scene(root, 380, 400));
-        dialog.setResizable(false);
-
-        final SwimSet[] result = new SwimSet[1];
-
+        final SwimSet[] out = new SwimSet[1];
         btnSave.setOnAction(e -> {
-            try {
-                int reps = Integer.parseInt(tfReps.getText().trim());
-                int dist = Integer.parseInt(tfDist.getText().trim());
-                StrokeType stroke = cbStroke.getValue();
-                Effort effort = cbEffort.getValue();
-                Course course = cbCourse.getValue();
-                TimeSpan goal = null;
-                String goalText = tfGoal.getText().trim();
-                if (!goalText.isEmpty()) {
-                    goal = parseFlexible(goalText);
-                }
-                String notes = taNotes.getText().trim();
-
-                SwimSet s = new SwimSet(stroke, reps, Distance.ofYards(dist), effort, course, notes);
-                if (goal != null) s.setGoalTime(goal);
-
-                result[0] = s;
-                dialog.close();
-            } catch (Exception ex) {
-                new Alert(Alert.AlertType.ERROR, "Invalid input: " + ex.getMessage()).showAndWait();
-            }
-        });
-
-        btnCancel.setOnAction(e -> {
-            result[0] = null;
+            SwimSet result = (existing == null ? new SwimSet() : existing);
+            result.setReps(spReps.getValue());
+            int val = spDist.getValue();
+            Distance dpr = isYards ? Distance.ofYards(val) : Distance.ofMeters(val);
+            result.setDistancePerRep(dpr);
+            var stToggle = strokeGroup.getSelectedToggle();
+            var efToggle = effortGroup.getSelectedToggle();
+            if (stToggle != null) result.setStroke((StrokeType)((RadioButton)stToggle).getUserData());
+            if (efToggle != null) result.setEffort((Effort)((RadioButton)efToggle).getUserData());
+            result.setEquipment(eqSelected);
+            result.setInterval(parseMmSs(tfInterval.getText()));
+            result.setGoalTime(parseMmSs(tfGoal.getText()));
+            out[0] = result;
             dialog.close();
         });
+        btnCancel.setOnAction(e -> { out[0] = null; dialog.close(); });
 
+        VBox content = new VBox(10,
+                row1,
+                row2,
+                row3,
+                row4,
+                row5,
+                new HBox(10, btnCancel, btnSave)
+        );
+        content.setPadding(new Insets(12));
+        content.getStyleClass().add("form-grid");
+
+        Scene scene = new Scene(content, 560, 440);
+        DialogUtil.prime(dialog, scene, null, 560, 440, (existing==null? "Add Set" : "Edit Set"));
         dialog.showAndWait();
-        return Optional.ofNullable(result[0]);
+        return out[0];
     }
 
-    // --- helper: parse "m:ss", "m:ss.hh", "ss", "ss.hh" into TimeSpan ----------
-    private static TimeSpan parseFlexible(String s) {
-        if (s == null) return null;
-        s = s.trim();
-        if (s.isEmpty()) return null;
-
-        int minutes = 0;
-        int seconds;
-        int hundredths = 0;
-
-        String work = s;
-        if (work.contains(":")) {
-            String[] parts = work.split(":");
-            minutes = parts[0].isBlank() ? 0 : Integer.parseInt(parts[0]);
-            work = (parts.length >= 2) ? parts[1] : "0";
-        }
-
-        if (work.contains(".")) {
-            String[] p2 = work.split("\\.");
-            seconds = p2[0].isBlank() ? 0 : Integer.parseInt(p2[0]);
-            String h = (p2.length >= 2) ? p2[1] : "0";
-            if (h.length() == 1) h = h + "0"; // "3.5" → ".50"
-            hundredths = Integer.parseInt(h.substring(0, Math.min(2, h.length())));
-        } else {
-            seconds = work.isBlank() ? 0 : Integer.parseInt(work);
-        }
-
-        return TimeSpan.ofMinutesSecondsMillis(minutes, seconds, hundredths * 10);
+    private static String mmss(double seconds) {
+        long s = Math.max(0, Math.round(seconds));
+        return String.format("%d:%02d", s / 60, s % 60);
+    }
+    private static swimworkoutbuilder_javafx.model.units.TimeSpan parseMmSs(String s) {
+        if (s == null || s.isBlank()) return null;
+        String[] p = s.split(":");
+        int m = (p.length>0? safeInt(p[0]) : 0);
+        int sec = (p.length>1? safeInt(p[1]) : 0);
+        return swimworkoutbuilder_javafx.model.units.TimeSpan.ofMinutesSecondsMillis(m, sec, 0);
+    }
+    private static int safeInt(String v) {
+        try { return Integer.parseInt(v.trim()); } catch (Exception e) { return 0; }
     }
 }
