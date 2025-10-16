@@ -9,6 +9,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.stage.Stage;
+import javafx.application.Platform;
 import swimworkoutbuilder_javafx.model.SetGroup;
 import swimworkoutbuilder_javafx.ui.UiUtil;
 import swimworkoutbuilder_javafx.ui.common.DialogUtil;
@@ -23,6 +24,9 @@ public final class SetGroupFormDialog {
         TextField tfName = new TextField();
         tfName.setPromptText("e.g., Warmup, Main, Cooldown");
         tfName.setTextFormatter(UiUtil.maxLen(60));
+        if (initial == null) {
+            tfName.setText("New group");
+        }
 
         Label lblReps = new Label("Repetitions:");
         Spinner<Integer> spReps = new Spinner<>(1, 99, 1);
@@ -91,6 +95,10 @@ public final class SetGroupFormDialog {
 
         Scene scene = new Scene(gp, 460, 240);
         DialogUtil.prime(dialog, scene, null, 460, 240, (initial==null? "Add Group" : "Edit Group"));
+        Platform.runLater(() -> {
+            tfName.requestFocus();
+            tfName.selectAll();
+        });
         dialog.showAndWait();
         return out[0];
     }

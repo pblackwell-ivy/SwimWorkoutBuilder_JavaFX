@@ -74,7 +74,7 @@ public final class MainView extends BorderPane {
 
         // RIGHT: Preview placeholder
         VBox rightColumn = new VBox();
-        rightColumn.getStyleClass().add("column-sheet");             // new
+        rightColumn.getStyleClass().add("column-sheet");             
         rightColumn.setPadding(new Insets(8, 12, 8, 8));
         Label previewLabel = new Label("Preview (coming soon)");
         previewLabel.getStyleClass().add("muted");              // was text-subtle -> muted

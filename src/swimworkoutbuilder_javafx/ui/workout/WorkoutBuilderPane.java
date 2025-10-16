@@ -13,6 +13,13 @@ import swimworkoutbuilder_javafx.model.SetGroup;
 import swimworkoutbuilder_javafx.model.SwimSet;
 import swimworkoutbuilder_javafx.model.enums.Course;
 import swimworkoutbuilder_javafx.state.AppState;
+import swimworkoutbuilder_javafx.ui.Icons;
+import swimworkoutbuilder_javafx.model.pacing.DefaultPacePolicy;
+import swimworkoutbuilder_javafx.model.pacing.PacePolicy;
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.model.units.TimeSpan;
+import swimworkoutbuilder_javafx.state.AppState;
 
 /**
  * Central “Workout Builder” pane.
@@ -22,6 +29,7 @@ import swimworkoutbuilder_javafx.state.AppState;
 public final class WorkoutBuilderPane {
 
     private final WorkoutBuilderPresenter presenter;
+    private static final PacePolicy POLICY = new DefaultPacePolicy();
 
     // Root layout containers
     private final VBox root = new VBox(10);
@@ -100,21 +108,36 @@ public final class WorkoutBuilderPane {
 
     private Node renderGroup(int gi, SetGroup g) {
         Label lbl = new Label(formatGroupTitle(g));
-        lbl.getStyleClass().add("label-setgroup-name");          // new
+        lbl.getStyleClass().add("label-setgroup-name");
 
-        Button btnAdd = new Button("+ Set");
-        btnAdd.getStyleClass().addAll("button","secondary","sm");     // new
-        // In renderGroup(...) — + Set
-        btnAdd.setOnAction(e -> {
-            // pass current workout + null for a new set
-            SwimSet set = SetFormDialog.show(AppState.get().getCurrentWorkout(), null);
-            if (set != null) {
-                presenter.addSet(gi, set);
+        Button btnAddSet = new Button("+ Set");
+        btnAddSet.getStyleClass().addAll("button","secondary","sm");
+
+        Button btnEdit = new Button();
+        btnEdit.getStyleClass().setAll("button","secondary","sm","icon");
+        btnEdit.setGraphic(Icons.make("square-pen", 16));
+        btnEdit.setTooltip(new Tooltip("Edit group"));
+
+        btnEdit.setOnAction(e -> {
+            // Open dialog prefilled with the current group
+            SetGroup edited = SetGroupFormDialog.show(g);
+            if (edited != null) {
+                // Apply edits back into the existing group instance
+                g.setName(edited.getName());
+                g.setReps(edited.getReps());
+                g.setNotes(edited.getNotes());
+                // Redraw this pane so the title reflects new values
+                refresh();
             }
         });
 
+        // Removed stray/duplicate titleBar declaration referencing undefined btnAdd
+
+        btnAddSet.setOnAction(e -> SetFormDialog.show(null)
+                .ifPresent(created -> presenter.addSet(gi, created)));
+
         Button btnDel = new Button("🗑");
-        btnDel.getStyleClass().addAll("button","danger", "sm");        // new
+        btnDel.getStyleClass().addAll("button","danger", "sm");
         btnDel.setTooltip(new Tooltip("Delete group"));
         btnDel.setOnAction(e -> {
             Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
@@ -126,13 +149,13 @@ public final class WorkoutBuilderPane {
         });
 
         Button btnUp = new Button("↑");
-        btnUp.getStyleClass().addAll("button","secondary", "sm");      // new
+        btnUp.getStyleClass().addAll("button","secondary", "sm");
         btnUp.setOnAction(e -> presenter.moveGroupUp(gi));
         Button btnDown = new Button("↓");
-        btnDown.getStyleClass().addAll("button","secondary","sm");    // new
+        btnDown.getStyleClass().addAll("button","secondary","sm");
         btnDown.setOnAction(e -> presenter.moveGroupDown(gi));
 
-        HBox titleBar = new HBox(8, lbl, spacer(), btnAdd, btnUp, btnDown, btnDel);
+        HBox titleBar = new HBox(8, lbl, spacer(), btnAddSet, btnEdit, btnUp, btnDown, btnDel);
         titleBar.setAlignment(Pos.CENTER_LEFT);
         titleBar.getStyleClass().add("wb-group-header");
 
@@ -152,33 +175,27 @@ public final class WorkoutBuilderPane {
 
     private Node renderSetRow(int gi, int si, SwimSet s) {
         Label lbl = new Label(formatSetLine(s));
-        lbl.getStyleClass().add("label-set-primary");            // new
+        lbl.getStyleClass().add("label-set-primary");
 
         Button btnEdit = new Button("✎");
-        btnEdit.getStyleClass().addAll("button","secondary","sm");    // new
+        btnEdit.getStyleClass().addAll("button","secondary","sm");
 
         btnEdit.setTooltip(new Tooltip("Edit set"));
-        // In renderSetRow(...) — Edit set
-        btnEdit.setOnAction(e -> {
-            // pass current workout + the existing set to prefill
-            SwimSet newSet = SetFormDialog.show(AppState.get().getCurrentWorkout(), s);
-            if (newSet != null) {
-                presenter.replaceSet(gi, si, newSet);
-            }
-        });
+        btnEdit.setOnAction(e -> SetFormDialog.show(s)
+                .ifPresent(edited -> presenter.replaceSet(gi, si, edited)));
 
         Button btnUp = new Button("↑");
-        btnUp.getStyleClass().addAll("button","secondary", "sm");      // new
+        btnUp.getStyleClass().addAll("button","secondary", "sm");
         btnUp.setTooltip(new Tooltip("Move set up"));
         btnUp.setOnAction(e -> presenter.moveSetUp(gi, si));
 
         Button btnDown = new Button("↓");
-        btnDown.getStyleClass().addAll("button","secondary","sm");    // new
+        btnDown.getStyleClass().addAll("button","secondary","sm");
         btnDown.setTooltip(new Tooltip("Move set down"));
         btnDown.setOnAction(e -> presenter.moveSetDown(gi, si));
 
         Button btnDelete = new Button("🗑");
-        btnDelete.getStyleClass().addAll("button","danger", "sm");     // new
+        btnDelete.getStyleClass().addAll("button","danger", "sm");
         btnDelete.setTooltip(new Tooltip("Delete set"));
         btnDelete.setOnAction(e -> presenter.deleteSet(gi, si));
 
@@ -192,6 +209,7 @@ public final class WorkoutBuilderPane {
     // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------
+
     private static Region spacer() {
         Region r = new Region();
         HBox.setHgrow(r, Priority.ALWAYS);
@@ -215,7 +233,26 @@ public final class WorkoutBuilderPane {
         String unit = meters ? " m" : " yd";
         String stroke = (s.getStroke() == null) ? "—" : s.getStroke().getLabel();
         String effort = (s.getEffort() == null) ? "" : " @" + s.getEffort().name();
+
+        // Compute Int/Goal with your policy
+        Workout w = AppState.get().getCurrentWorkout();
+        Swimmer swimmer = AppState.get().getCurrentSwimmer();
+        String intervalTxt = "";
+        String goalTxt     = "";
+
+        if (w != null && swimmer != null && s.getStroke() != null && s.getEffort() != null) {
+            try {
+                int goalSec     = (s.getGoalTime() != null)
+                        ? (int) Math.round(s.getGoalTime().toSeconds())
+                        : (int) Math.round(POLICY.goalSeconds(w, s, swimmer, 0));
+                int intervalSec = POLICY.intervalSeconds(w, s, swimmer, 0);
+
+                intervalTxt = " – Int "  + TimeSpan.ofSeconds(intervalSec).toString();
+                goalTxt     = " – Goal " + TimeSpan.ofSeconds(goalSec).toString();
+            } catch (Throwable ignored) { /* leave blank if any seed missing */ }
+        }
+
         String notes = (s.getNotes() == null || s.getNotes().isBlank()) ? "" : " — " + s.getNotes().trim();
-        return reps + "×" + amount + unit + " " + stroke + effort + notes;
+        return reps + "×" + amount + unit + " " + stroke + effort + intervalTxt + goalTxt + notes;
     }
 }

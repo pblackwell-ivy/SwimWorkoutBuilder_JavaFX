@@ -473,4 +473,20 @@
   -fx-background-color: #E6F2FF;
   -fx-text-fill: -swim-text;
 }
+/* Add-Set dialog */
+.set-dialog .section-label,
+.set-dialog .section-label .text {
+  -fx-font-weight: 700;
+  -fx-font-size: 13px;
+}
+.set-dialog .section-sub   { -fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -swim-text-weak; }
 
+.equipment-icon {
+  -fx-opacity: 0.9;
+}
+
+.equipment-icon:hover {
+  -fx-opacity: 1.0;
+  -fx-scale-x: 1.06;
+  -fx-scale-y: 1.06;
+}

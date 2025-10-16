@@ -31,7 +31,7 @@ public final class PreviewPane extends BorderPane {
     private void buildUI() {
         setPadding(new Insets(8));
         setPadding(new Insets(8));
-        getStyleClass().add("surface"); // new
+        getStyleClass().add("surface"); 
         var title = new Label("Preview");
         title.getStyleClass().add("section-title");
 

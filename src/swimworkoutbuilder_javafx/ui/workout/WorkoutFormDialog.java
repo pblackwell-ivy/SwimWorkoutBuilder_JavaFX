@@ -86,7 +86,7 @@ public final class WorkoutFormDialog {
         root.setBottom(buttons);
 
         Scene scene = new Scene(root, 460, 280);
-        Theme.apply(scene, WorkoutFormDialog.class);                // NEW: theme hook
+        Theme.apply(scene, WorkoutFormDialog.class);                
         dialog.setScene(scene);
 
         final Workout[] result = new Workout[1];

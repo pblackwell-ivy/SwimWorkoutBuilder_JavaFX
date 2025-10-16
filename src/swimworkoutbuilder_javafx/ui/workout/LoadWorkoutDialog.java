@@ -84,8 +84,8 @@ public final class LoadWorkoutDialog {
 
         Button btnOpen = new Button("Open");
         Button btnCancel = new Button("Cancel");
-        btnOpen.getStyleClass().addAll("button","primary");     // new
-        btnCancel.getStyleClass().addAll("button","secondary"); // new
+        btnOpen.getStyleClass().addAll("button","primary");     
+        btnCancel.getStyleClass().addAll("button","secondary"); 
         btnOpen.setDefaultButton(true);
         btnCancel.setCancelButton(true);
         btnOpen.setDisable(true);
@@ -121,11 +121,11 @@ public final class LoadWorkoutDialog {
         btnCancel.setOnAction(e -> { result[0] = null; dialog.close(); });
 
         BorderPane root = new BorderPane(list);
-        root.getStyleClass().add("surface");           // new
+        root.getStyleClass().add("surface");           
         HBox buttons = new HBox(10, btnCancel, btnOpen);
         buttons.setPadding(new Insets(8));
         buttons.setAlignment(Pos.CENTER_RIGHT);
-        buttons.getStyleClass().add("toolbar");     // new
+        buttons.getStyleClass().add("toolbar");     
         root.setBottom(buttons);
         root.setPadding(new Insets(8));
 

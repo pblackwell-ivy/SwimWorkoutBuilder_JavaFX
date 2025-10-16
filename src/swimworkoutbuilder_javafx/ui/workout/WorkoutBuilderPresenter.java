@@ -1,10 +1,7 @@
 package swimworkoutbuilder_javafx.ui.workout;
 
 import java.io.IOException;
-import java.io.IOException;
 import java.time.Instant;
-import java.time.Instant;
-import java.util.ArrayList;
 import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -15,7 +12,10 @@ import swimworkoutbuilder_javafx.model.enums.Course;
 import swimworkoutbuilder_javafx.model.units.Distance;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
-import swimworkoutbuilder_javafx.store.LocalStore;
+import swimworkoutbuilder_javafx.model.pacing.DefaultPacePolicy;
+import swimworkoutbuilder_javafx.model.pacing.PacePolicy;
+import swimworkoutbuilder_javafx.model.units.TimeSpan;
+
 /**
  * [Presenter] WorkoutBuilderPresenter for the "workout" feature.
  *
@@ -49,6 +49,7 @@ import swimworkoutbuilder_javafx.store.LocalStore;
 public class WorkoutBuilderPresenter {
 
     private final AppState app;
+    private static final PacePolicy POLICY = new DefaultPacePolicy();
 
     private final ObservableList<SetGroup> groups = FXCollections.observableArrayList();
 
@@ -59,8 +60,8 @@ public class WorkoutBuilderPresenter {
 
     private final IntegerProperty refreshTick = new SimpleIntegerProperty(0);
 
-    // NEW: track unsaved edits
-    private final BooleanProperty dirty = new SimpleBooleanProperty(false); // NEW
+    // track unsaved edits
+    private final BooleanProperty dirty = new SimpleBooleanProperty(false); 
 
     public WorkoutBuilderPresenter(AppState app) {
         this.app = app;
@@ -68,14 +69,14 @@ public class WorkoutBuilderPresenter {
         if (app.getCurrentWorkout() != null) {
             groups.setAll(app.getCurrentWorkout().getGroups());
             computeStats();
-            dirty.set(false); // NEW
+            dirty.set(false); 
         }
 
         app.currentWorkoutProperty().addListener((obs, oldW, newW) -> {
             groups.clear();
             if (newW != null) groups.setAll(newW.getGroups());
             computeStats();
-            dirty.set(false); // NEW
+            dirty.set(false); 
         });
     }
 
@@ -90,7 +91,7 @@ public class WorkoutBuilderPresenter {
 
     public IntegerProperty refreshTickProperty() { return refreshTick; }
 
-    public ReadOnlyBooleanProperty dirtyProperty() { return dirty; } // NEW
+    public ReadOnlyBooleanProperty dirtyProperty() { return dirty; } 
 
     public Workout getDisplayedWorkout() { return app.getCurrentWorkout(); }
 
@@ -110,27 +111,30 @@ public class WorkoutBuilderPresenter {
     }
 
     // ---------- Group operations ----------
+    public void addGroup(String name, int reps, String notes) {                 
+        var w = app.getCurrentWorkout();                                        
+        if (w == null) return;                                                  
+        String n = (name == null || name.isBlank()) ? "New Group" : name.trim();
+        var g = new swimworkoutbuilder_javafx.model.SetGroup(n);                
+        g.setReps(Math.max(1, reps));                                           
+        if (notes != null && !notes.isBlank()) g.setNotes(notes.trim());        
+        w.addSetGroup(g);                                                        
+        groups.setAll(w.getGroups());                                           
+        touch();                                                                 
+    }                                                                            
 
-    public void addGroup(String name) {
+    public void updateGroup(int index, String name, int reps, String notes) {
         Workout w = app.getCurrentWorkout();
         if (w == null) return;
-        String n = (name == null || name.isBlank()) ? "New Group" : name.trim();
-        w.addSetGroup(new SetGroup(n));
-        groups.setAll(w.getGroups());
-        touch();
+        if (index < 0 || index >= w.getGroupCount()) return;
+
+        SetGroup g = w.getGroups().get(index);
+        if (name != null)  g.setName(name.trim());
+        if (reps > 0)      g.setReps(reps);
+        g.setNotes((notes == null) ? "" : notes.trim());
+
+        touch(); // recompute + tick + mark dirty
     }
-    // ---------- Group operations ----------
-    public void addGroup(String name, int reps, String notes) {                 // NEW
-        var w = app.getCurrentWorkout();                                        // NEW
-        if (w == null) return;                                                  // NEW
-        String n = (name == null || name.isBlank()) ? "New Group" : name.trim();// NEW
-        var g = new swimworkoutbuilder_javafx.model.SetGroup(n);                // NEW
-        g.setReps(Math.max(1, reps));                                           // NEW
-        if (notes != null && !notes.isBlank()) g.setNotes(notes.trim());        // NEW
-        w.addSetGroup(g);                                                        // NEW
-        groups.setAll(w.getGroups());                                           // NEW
-        touch();                                                                 // NEW
-    }                                                                            // NEW
 
     public void deleteGroup(int index) {
         Workout w = app.getCurrentWorkout();
@@ -217,16 +221,16 @@ public class WorkoutBuilderPresenter {
     // --- add these methods anywhere in the class body (e.g., after your set ops) ---
 
     /** Update name/notes from the header and persist. */
-    public void updateHeader(String name, String notes) {                   // NEW
-        Workout w = app.getCurrentWorkout();                                // NEW
-        if (w == null) return;                                              // NEW
-        w.setName(name == null ? "" : name.trim());                         // NEW
-        w.setNotes(notes == null ? "" : notes.trim());                      // NEW
-        w.setUpdatedAt(Instant.now());                                      // NEW
-        try { LocalStore.saveWorkout(w); } catch (Exception ignored) {}     // NEW
-        computeStats();                                                     // NEW
-        refreshTick.set(refreshTick.get() + 1);                             // NEW
-    }                                                                       // NEW
+    public void updateHeader(String name, String notes) {                   
+        Workout w = app.getCurrentWorkout();                                
+        if (w == null) return;                                              
+        w.setName(name == null ? "" : name.trim());                         
+        w.setNotes(notes == null ? "" : notes.trim());                      
+        w.setUpdatedAt(Instant.now());                                      
+        try { LocalStore.saveWorkout(w); } catch (Exception ignored) {}     
+        computeStats();                                                     
+        refreshTick.set(refreshTick.get() + 1);                             
+    }                                                                       
 
     /** Change pool length (Course)
      * Rounds each set's per-rep distance up to the nearest multiple of the pool length.
@@ -319,7 +323,7 @@ public class WorkoutBuilderPresenter {
         } else {
             groups.setAll(w.getGroups());
         }
-        dirty.set(false);     // NEW
+        dirty.set(false);     
         bumpRefresh();
     }
 
@@ -331,7 +335,7 @@ public class WorkoutBuilderPresenter {
         }
         w.setUpdatedAt(Instant.now());
         LocalStore.saveWorkout(w);
-        dirty.set(false);     // NEW
+        dirty.set(false);     
     }
 
     private void bumpRefresh() {
@@ -341,7 +345,7 @@ public class WorkoutBuilderPresenter {
     private void touch() {
         computeStats();
         refreshTick.set(refreshTick.get() + 1);
-        dirty.set(true);      // NEW
+        dirty.set(true);      
     }
 
     private void persist(Workout w) {
@@ -377,6 +381,7 @@ public class WorkoutBuilderPresenter {
         return yards;
     }
 
+    // Replace the entire computeStats() method with this:
     private void computeStats() {
         Workout w = app.getCurrentWorkout();
         if (w == null) {
@@ -387,20 +392,63 @@ public class WorkoutBuilderPresenter {
             return;
         }
 
-        // ONE rounding, to whole meters, from the model’s double
+        // --- Distance text (unchanged behavior) ---
         long meters = Math.round(w.totalDistance().toMeters());
-
         Course course = (w.getCourse() == null) ? Course.SCY : w.getCourse();
-        String distText = "—";
-        switch (course) {
-            case SCY -> distText = totalYardsInt(w) + " yd";
-            case SCM, LCM -> distText = meters + " m";
+        String distText = switch (course) {
+            case SCY -> totalYardsInt(w) + " yd";
+            case SCM, LCM -> meters + " m";
+        };
+        totalDistanceText.set(distText);
+
+        // --- Time totals via pacing policy ---
+        var swimmer = app.getCurrentSwimmer();
+        if (swimmer == null) {
+            swimTimeText.set("—");
+            restTimeText.set("—");
+            durationText.set("—");
+            return;
         }
 
-        totalDistanceText.set(distText);
-        // Time stats still TBD
-        swimTimeText.set("—");
-        restTimeText.set("—");
-        durationText.set("—");
+        double swimSec = 0.0;
+        double restSec = 0.0;
+
+        try {
+            if (w.getGroups() != null) {
+                for (var g : w.getGroups()) {
+                    if (g == null || g.getSets() == null) continue;
+                    int groupReps = Math.max(1, g.getReps());
+
+                    for (int gr = 0; gr < groupReps; gr++) {
+                        for (var s : g.getSets()) {
+                            if (s == null) continue;
+                            int setReps = Math.max(1, s.getReps());
+                            for (int r = 0; r < setReps; r++) {
+                                // Policy works in canonical meters + your multipliers
+                                double gSecs = Math.max(0.0, POLICY.goalSeconds(w, s, swimmer, r));
+                                double rSecs = Math.max(0.0, POLICY.restSeconds(w, s, swimmer, r));
+                                swimSec += gSecs;
+                                restSec += rSecs;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            // If seeds are missing or anything throws, fall back to blanks
+            swimTimeText.set("—");
+            restTimeText.set("—");
+            durationText.set("—");
+            return;
+        }
+
+        // Format using your TimeSpan
+        TimeSpan swim = TimeSpan.ofSeconds(swimSec);
+        TimeSpan rest = TimeSpan.ofSeconds(restSec);
+        TimeSpan total = TimeSpan.ofSeconds(swimSec + restSec);
+
+        swimTimeText.set(swim.toString());
+        restTimeText.set(rest.toString());
+        durationText.set(total.toString());
     }
 }

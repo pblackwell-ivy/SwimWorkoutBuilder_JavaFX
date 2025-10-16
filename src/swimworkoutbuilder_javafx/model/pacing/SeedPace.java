@@ -15,8 +15,8 @@ import swimworkoutbuilder_javafx.model.units.TimeSpan;
  *
  * <h2>Responsibilities</h2>
  * <ul>
- *   <li>Store the original test distance as a {@link swimworkoutbuilder.model.units.Distance}.</li>
- *   <li>Store the corresponding completion time as a {@link swimworkoutbuilder.model.units.TimeSpan}.</li>
+ *   <li>Store the original test distance as a {@link swimworkoutbuilder_javafx.model.units.Distance}.</li>
+ *   <li>Store the corresponding completion time as a {@link swimworkoutbuilder_javafx.model.units.TimeSpan}.</li>
  *   <li>Derive and cache the swimmer’s canonical speed in meters per second.</li>
  *   <li>Provide immutability, ensuring the seed pace cannot change once created.</li>
  *   <li>Expose the timestamp of when the seed pace was last recorded or updated.</li>
@@ -36,16 +36,16 @@ import swimworkoutbuilder_javafx.model.units.TimeSpan;
  *
  * <h2>Integration</h2>
  * <ul>
- *   <li>Used by {@link swimworkoutbuilder.model.Swimmer} to maintain per-stroke seed paces.</li>
- *   <li>Queried by {@link swimworkoutbuilder.model.pacing.DefaultPacePolicy} for goal and interval computation.</li>
+ *   <li>Used by {@link swimworkoutbuilder_javafx.model.Swimmer} to maintain per-stroke seed paces.</li>
+ *   <li>Queried by {@link swimworkoutbuilder_javafx.model.pacing.DefaultPacePolicy} for goal and interval computation.</li>
  *   <li>Supports extensions such as per-course adjustments or historical tracking.</li>
  * </ul>
  *
  * @author Parker Blackwell
  * @version MVP 1.0 (October 2025)
- * @see swimworkoutbuilder.model.units.Distance
- * @see swimworkoutbuilder.model.units.TimeSpan
- * @see swimworkoutbuilder.model.Swimmer
+ * @see swimworkoutbuilder_javafx.model.units.Distance
+ * @see swimworkoutbuilder_javafx.model.units.TimeSpan
+ * @see swimworkoutbuilder_javafx.model.Swimmer
  */
 public final class SeedPace implements java.io.Serializable {
     private static final long serialVersionUID = 1L;
