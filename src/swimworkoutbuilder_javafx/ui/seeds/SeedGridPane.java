@@ -36,14 +36,15 @@ public final class SeedGridPane extends BorderPane {
     private final GridPane seedGrid = new GridPane();
     private final Label title = new Label("Seed Times");
 
+    // Header action buttons (need to be fields because wireState() binds to them)
+    private Button btnEdit;
+    private Button btnSave;
+    private Button btnCancel;
+
     private final ToggleGroup unitGroup = new ToggleGroup();
     private final RadioButton rbYd = new RadioButton("yd");
     private final RadioButton rbM  = new RadioButton("m");
     private final ObjectProperty<Unit> displayUnit = new SimpleObjectProperty<>(Unit.YD);
-
-    private final Button btnEdit = new Button("✎");
-    private final Button btnSave = new Button("💾");
-    private final Button btnCancel = new Button("↩");
 
     private final Map<StrokeType, TextField> fields = new EnumMap<>(StrokeType.class);
 
@@ -79,22 +80,25 @@ public final class SeedGridPane extends BorderPane {
         // — Title + actions in a single header row
         title.getStyleClass().add("card-title");
 
-        btnEdit.getStyleClass().setAll("button", "secondary", "sm", "icon");
-        btnSave.getStyleClass().setAll("button", "primary",   "sm", "icon");
-        btnCancel.getStyleClass().setAll("button", "ghost",    "sm", "icon");
+        btnEdit = new Button();
+        btnEdit.getStyleClass().setAll("button","secondary","sm","icon");
+        btnEdit.setGraphic(Icons.make("pencil-swim-text", 16));
+        btnEdit.setTooltip(new Tooltip("Edit seed times"));
 
-        btnEdit.setGraphic(Icons.make("square-pen", 16));
-        btnSave.setGraphic(Icons.make("save", 16));
-        btnCancel.setGraphic(Icons.make("circle-x", 16));
+        btnSave = new Button();
+        btnSave.getStyleClass().setAll("button","secondary","sm","icon");
+        btnSave.setGraphic(Icons.make("save-swim-text", 16));
+        btnSave.setTooltip(new Tooltip("Save seed times"));
+
+        btnCancel = new Button();
+        btnCancel.getStyleClass().setAll("button","secondary","sm","icon");
+        btnCancel.setGraphic(Icons.make("circle-x-swim-text", 16));
+        btnCancel.setTooltip(new Tooltip("Cancel edits"));
 
         // ensure small consistent square hit targets
         for (Button b : new Button[]{btnEdit, btnCancel, btnSave}) {
             b.setMinWidth(32); b.setPrefWidth(32);
         }
-
-        btnEdit.setTooltip(new Tooltip("Edit seed times"));
-        btnSave.setTooltip(new Tooltip("Save seed times"));
-        btnCancel.setTooltip(new Tooltip("Cancel"));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);

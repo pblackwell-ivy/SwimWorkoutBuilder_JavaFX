@@ -8,10 +8,12 @@ package swimworkoutbuilder_javafx.state;
 import java.io.Serializable;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.ui.workout.WorkoutBuilderPresenter;
 
 /**
  * Global observable state for the application (MVVM-ish “store”).
@@ -58,6 +60,9 @@ public final class AppState implements Serializable {
 
     /** Currently selected workout (may be {@code null}). */
     private final ObjectProperty<Workout> currentWorkout = new SimpleObjectProperty<>();
+
+    /** Single presenter shared by header/builder panes; created once and exposed via AppState. */
+    private final WorkoutBuilderPresenter workoutBuilderPresenter = new WorkoutBuilderPresenter(this);
 
     // ------------------------------------------------------------
     // Construction & invariants
@@ -107,6 +112,13 @@ public final class AppState implements Serializable {
         currentSwimmer.set(null);
         currentWorkout.set(null);
     }
+
+    /** Presenter accessor for callers like ActionBar/MainView. */
+    public WorkoutBuilderPresenter getWorkoutBuilderPresenter() { return workoutBuilderPresenter; }
+    /** Convenience pass‑through to observe/save dirty state globally if needed. */
+    public ReadOnlyBooleanProperty dirtyProperty() { return workoutBuilderPresenter.dirtyProperty(); }
+    /** Persist the current workout via presenter (null‑safe). */
+    public void persistCurrentWorkout() { workoutBuilderPresenter.persistCurrentWorkout(); }
 
     @Override
     public String toString() {

@@ -67,13 +67,13 @@ public final class SwimmerCard {
         // Buttons: classes + icons + tooltips
         btnEdit.getStyleClass().setAll("button","secondary","sm","icon");
         btnSave.getStyleClass().setAll("button","primary","sm","icon");
-        btnCancel.getStyleClass().setAll("button","ghost","sm","icon");
+        btnCancel.getStyleClass().setAll("button","secondary","sm","icon");
         btnDelete.getStyleClass().setAll("button","danger","sm","icon");
 
-        btnEdit.setGraphic(Icons.make("square-pen", 16));
-        btnDelete.setGraphic(Icons.make("trash-2", 16));
-        btnSave.setGraphic(Icons.make("save", 16));
-        btnCancel.setGraphic(Icons.make("circle-x", 16));
+        btnEdit.setGraphic(Icons.make("pencil-swim-text", 16));
+        btnDelete.setGraphic(Icons.make("trash-2-danger", 16));
+        btnSave.setGraphic(Icons.make("save-swim-text", 16));
+        btnCancel.setGraphic(Icons.make("circle-x-swim-text", 16));
 
         btnEdit.setTooltip(new Tooltip("Edit swimmer"));
         btnSave.setTooltip(new Tooltip("Save changes"));

@@ -10,6 +10,7 @@ import javafx.util.StringConverter;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
+import swimworkoutbuilder_javafx.ui.Icons;
 import swimworkoutbuilder_javafx.ui.workout.LoadWorkoutDialog;
 import swimworkoutbuilder_javafx.ui.workout.WorkoutFormDialog;
 
@@ -52,6 +53,7 @@ public final class ActionBar {
     private final Button btnNewWorkout  = new Button("New Workout");
     private final Button btnOpenWorkout = new Button("Open Workout");
     private final Button btnPrint       = new Button("Print");
+    private final Button btnSaveWorkout = new Button();
 
     // ---------------------------------------------------------------------
     // Lifecycle
@@ -100,11 +102,16 @@ public final class ActionBar {
         setRoles(btnOpenWorkout, "secondary");
         setRoles(btnPrint,       "ghost");
 
+        setRoles(btnSaveWorkout, "primary", "sm", "icon");
+        btnSaveWorkout.setGraphic(Icons.make("save", 16));
+        btnSaveWorkout.setTooltip(new Tooltip("Save workout"));
+        btnSaveWorkout.disableProperty().bind(AppState.get().getWorkoutBuilderPresenter().dirtyProperty().not());
+
         // --- Layout: [ Swimmer: (combo)  New  Manage ]  |spacer|  [ New Workout  Open  Print ]
         Label swimmerLbl = new Label("Swimmer:");
         HBox left = new HBox(8, swimmerLbl, cbSwimmer, btnNewSwimmer, btnManageSwimmer);
         Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox right = new HBox(8, btnNewWorkout, btnOpenWorkout, btnPrint);
+        HBox right = new HBox(8, btnNewWorkout, btnOpenWorkout, btnSaveWorkout, btnPrint);
         root.getChildren().addAll(left, spacer, right);
     }
 
@@ -158,6 +165,7 @@ public final class ActionBar {
         btnNewSwimmer.setOnAction(e -> onAddSwimmer());
 
         btnNewWorkout.setOnAction(e -> {
+            if (!confirmLoseChanges()) return;
             Swimmer cur = app.getCurrentSwimmer();
             if (cur == null) {
                 new Alert(Alert.AlertType.INFORMATION, "Choose or create a swimmer first.").showAndWait();
@@ -171,6 +179,7 @@ public final class ActionBar {
         });
 
         btnOpenWorkout.setOnAction(e -> {
+            if (!confirmLoseChanges()) return;
             Swimmer cur = app.getCurrentSwimmer();
             if (cur == null) {
                 new Alert(Alert.AlertType.INFORMATION, "Choose or create a swimmer first.").showAndWait();
@@ -178,6 +187,11 @@ public final class ActionBar {
             }
             var w = LoadWorkoutDialog.show(cur.getId());
             if (w != null) app.setCurrentWorkout(w);
+        });
+
+        btnSaveWorkout.setOnAction(e -> {
+            var presenter = AppState.get().getWorkoutBuilderPresenter();
+            if (presenter != null) presenter.persistCurrentWorkout();
         });
 
         btnPrint.setOnAction(e ->
@@ -249,5 +263,29 @@ public final class ActionBar {
         String left  = (preferred != null && !preferred.isBlank()) ? preferred :
                 (first != null ? first : "");
         return (left + ((last != null && !last.isBlank()) ? " " + last : "")).trim();
+    }
+
+    private boolean confirmLoseChanges() {
+        var presenter = AppState.get().getWorkoutBuilderPresenter();
+        if (presenter == null || !presenter.dirtyProperty().get()) return true;
+
+        var SAVE = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        var DONT = new ButtonType("Don’t Save", ButtonBar.ButtonData.NO);
+        var CANCEL = ButtonType.CANCEL;
+
+        Alert a = new Alert(Alert.AlertType.CONFIRMATION,
+                "You have unsaved changes to this workout.", SAVE, DONT, CANCEL);
+        a.setHeaderText("Unsaved changes");
+        a.setTitle("Save changes?");
+
+        ButtonType choice = a.showAndWait().orElse(CANCEL);
+        if (choice == SAVE) {
+            presenter.persistCurrentWorkout();
+            return true;
+        } else if (choice == DONT) {
+            return true;
+        } else {
+            return false;
+        }
     }
 }

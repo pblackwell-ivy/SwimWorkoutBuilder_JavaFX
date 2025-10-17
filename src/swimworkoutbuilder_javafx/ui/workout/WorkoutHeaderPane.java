@@ -13,6 +13,7 @@ import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.model.enums.Course;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.ui.DateFmt;
+import swimworkoutbuilder_javafx.ui.Icons;
 
 /**
  * Workout header
@@ -50,10 +51,12 @@ public final class WorkoutHeaderPane {
     private final Label lblTimestamps = new Label();
 
     // Actions
-    private final Button btnEdit   = new Button("✎");
-    private final Button btnDelete = new Button("🗑");
-    private final Button btnSave   = new Button("Save");
-    private final Button btnCancel = new Button("Cancel");
+    private final Button btnEdit   = new Button();
+    private final Button btnDelete = new Button();
+    private final Button btnSave   = new Button();
+    private final Button btnCancel = new Button();
+    private final Button btnSaveDirty = new Button();   // global save button that apppears when the workout is dirty
+    private final Label chipUnsaved = new Label("Unsaved"); // subtle chip next to the title
 
     private boolean editing = false;
     private WorkoutBuilderPresenter presenter;
@@ -71,6 +74,11 @@ public final class WorkoutHeaderPane {
     public void bindPresenter(WorkoutBuilderPresenter p) {
         this.presenter = p;
         if (p == null) return;
+        if (p != null) {
+            // Show “Unsaved” chip and the Save Workout button whenever dirty
+            chipUnsaved.visibleProperty().bind(p.dirtyProperty());
+            btnSaveDirty.visibleProperty().bind(p.dirtyProperty());
+        }
 
         // Live redraw when groups/sets change
         p.refreshTickProperty().addListener((o, a, b) -> refreshFrom(app.getCurrentWorkout()));
@@ -101,19 +109,57 @@ public final class WorkoutHeaderPane {
         lblTitle.getStyleClass().add("workout-title");
         lblNotes.getStyleClass().add("workout-notes");
 
-        btnEdit.getStyleClass().addAll("button","secondary","sm");
-        btnDelete.getStyleClass().addAll("button","danger","sm");
-        btnSave.getStyleClass().addAll("button","primary");
-        btnCancel.getStyleClass().addAll("button","ghost");
+        // AFTER — match SwimmerCard style and use your new PNGs
+        btnEdit.getStyleClass().setAll("button","secondary","sm","icon");
+        btnDelete.getStyleClass().setAll("button","danger","sm","icon");
+        btnSave.getStyleClass().setAll("button","accent","sm");
+        btnCancel.getStyleClass().setAll("button","secondary","sm");
+
+        chipUnsaved.getStyleClass().add("chip");
+        chipUnsaved.setVisible(false);
+        chipUnsaved.managedProperty().bind(chipUnsaved.visibleProperty());
+
+        // Global Save button (always-on when dirty)
+        // NOTE: do NOT add the "icon" class here — it forces a transparent background.
+        btnSaveDirty.getStyleClass().setAll("button","primary","sm");
+        btnSaveDirty.setGraphic(Icons.make("save-white", 16));
+        btnSaveDirty.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        btnSaveDirty.setTooltip(new Tooltip("Save workout (⌘S / Ctrl+S)"));
+        btnSaveDirty.setVisible(false);
+        btnSaveDirty.managedProperty().bind(btnSaveDirty.visibleProperty());
+
+
+        // icons (all live in /resources/icons)
+        btnEdit.setGraphic(Icons.make("pencil-swim-text", 16));
+        btnDelete.setGraphic(Icons.make("trash-2-danger", 16));   // use danger variant for destructive
+        btnSave.setGraphic(Icons.make("save-swim-text", 16));
+        btnCancel.setGraphic(Icons.make("circle-x-swim-text", 16));
+
+        // ensure icon-only
+        btnEdit.setText(null);
+        btnDelete.setText(null);
+        btnSave.setText(null);
+        btnCancel.setText(null);
+
+        // optional: keep focus ring off for compact toolbar icons
+        for (Button b : new Button[]{btnEdit, btnDelete, btnSave, btnCancel, btnSaveDirty}) {
+            b.setFocusTraversable(false);
+        }
+
+        // (your visibility bindings for edit/view modes can remain as-is)
+        // Show the chip next to the title
+        HBox titleWithChip = new HBox(6, lblTitle, chipUnsaved);
+        titleWithChip.setAlignment(Pos.CENTER_LEFT);
 
         // Row 1: Title (label in view mode) + actions at right
         HBox row1 = new HBox(10);
         Region spacer1 = new Region(); HBox.setHgrow(spacer1, Priority.ALWAYS);
-        HBox actionsView = new HBox(8, btnEdit, btnDelete);
+        HBox actionsView = new HBox(8, btnSaveDirty, btnEdit, btnDelete);
         HBox actionsEdit = new HBox(8, btnCancel, btnSave);
         actionsEdit.setVisible(false);
         actionsEdit.managedProperty().bind(actionsEdit.visibleProperty());
-        row1.getChildren().addAll(lblTitle, spacer1, actionsView, actionsEdit);
+        actionsView.managedProperty().bind(actionsView.visibleProperty());
+        row1.getChildren().addAll(titleWithChip, spacer1, actionsView, actionsEdit);
         row1.setAlignment(Pos.CENTER_LEFT);
         row1.getStyleClass().add("toolbar");
 
@@ -166,6 +212,14 @@ public final class WorkoutHeaderPane {
         btnCancel.setOnAction(e -> { refreshFrom(app.getCurrentWorkout()); exitEdit(actionsView, actionsEdit); });
         btnSave.setOnAction(e -> onSave(actionsView, actionsEdit));
         btnDelete.setOnAction(e -> onDelete());
+        btnSaveDirty.setOnAction(e -> {
+            try {
+                app.persistCurrentWorkout();
+                refreshFrom(app.getCurrentWorkout());
+            } catch (Exception ex) {
+                new Alert(Alert.AlertType.ERROR, "Failed to save workout:\n" + ex.getMessage(), ButtonType.OK).showAndWait();
+            }
+        });
 
         // Course changes apply immediately (always enabled)
         tgCourse.selectedToggleProperty().addListener((obs, o, n) -> {
@@ -227,10 +281,25 @@ public final class WorkoutHeaderPane {
         String notes = tfNotes.getText().trim();
         Course c     = selectedCourse();
 
-        presenter.saveHeaderEdits(name, notes, c);   // one-shot save+persist
+        // 1) apply edits to the model (updates header stats etc.)
+        presenter.saveHeaderEdits(name, notes, c);
 
+        // 2) persist to disk
+        try {
+            // Prefer the app helper if you have it:
+            // (We added this earlier when wiring persistence.)
+            app.persistCurrentWorkout();
+            // If you *don’t* have app.persistCurrentWorkout(), use:
+            // LocalStore.saveWorkout(app.getCurrentWorkout());
+        } catch (Exception ex) {
+            new Alert(Alert.AlertType.ERROR, "Failed to save workout:\n" + ex.getMessage(),
+                    ButtonType.OK).showAndWait();
+            // Still fall through to exit edit; user can try again.
+        }
+
+        // 3) exit edit + refresh UI (timestamps will reflect updatedAt)
         exitEdit(actionsView, actionsEdit);
-        refreshFrom(app.getCurrentWorkout());        // reflect updated model
+        refreshFrom(app.getCurrentWorkout());
     }
 
     private void onDelete() {

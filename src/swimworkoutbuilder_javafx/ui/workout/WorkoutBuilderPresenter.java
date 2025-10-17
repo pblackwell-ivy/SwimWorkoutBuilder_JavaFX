@@ -120,8 +120,8 @@ public class WorkoutBuilderPresenter {
         if (notes != null && !notes.isBlank()) g.setNotes(notes.trim());        
         w.addSetGroup(g);                                                        
         groups.setAll(w.getGroups());                                           
-        touch();                                                                 
-    }                                                                            
+        markDirty();
+    }
 
     public void updateGroup(int index, String name, int reps, String notes) {
         Workout w = app.getCurrentWorkout();
@@ -133,7 +133,7 @@ public class WorkoutBuilderPresenter {
         if (reps > 0)      g.setReps(reps);
         g.setNotes((notes == null) ? "" : notes.trim());
 
-        touch(); // recompute + tick + mark dirty
+        markDirty(); // recompute + tick + mark dirty
     }
 
     public void deleteGroup(int index) {
@@ -141,7 +141,7 @@ public class WorkoutBuilderPresenter {
         if (w == null || index < 0 || index >= w.getGroupCount()) return;
         w.removeSetGroup(index);
         groups.setAll(w.getGroups());
-        touch();
+        markDirty();
     }
 
     public void moveGroupUp(int index) {
@@ -149,7 +149,7 @@ public class WorkoutBuilderPresenter {
         if (w == null || index <= 0 || index >= w.getGroupCount()) return;
         w.swapGroups(index, index - 1);
         groups.setAll(w.getGroups());
-        touch();
+        markDirty();
     }
 
     public void moveGroupDown(int index) {
@@ -157,7 +157,7 @@ public class WorkoutBuilderPresenter {
         if (w == null || index < 0 || index >= w.getGroupCount() - 1) return;
         w.swapGroups(index, index + 1);
         groups.setAll(w.getGroups());
-        touch();
+        markDirty();
     }
 
     // ---------- Set operations ----------
@@ -167,7 +167,7 @@ public class WorkoutBuilderPresenter {
         if (w == null || set == null) return;
         if (groupIndex < 0 || groupIndex >= w.getGroupCount()) return;
         w.getGroups().get(groupIndex).addSet(set);
-        touch();
+        markDirty();
     }
 
     public void deleteSet(int groupIndex, int setIndex) {
@@ -177,7 +177,7 @@ public class WorkoutBuilderPresenter {
         var g = w.getGroups().get(groupIndex);
         if (setIndex < 0 || setIndex >= g.getSetCount()) return;
         g.getSets().remove(setIndex);
-        touch();
+        markDirty();
     }
 
     public void moveSetUp(int groupIndex, int setIndex) {
@@ -190,7 +190,7 @@ public class WorkoutBuilderPresenter {
         var b = g.getSets().get(setIndex);
         g.getSets().set(setIndex - 1, b);
         g.getSets().set(setIndex, a);
-        touch();
+        markDirty();
     }
 
     public void moveSetDown(int groupIndex, int setIndex) {
@@ -203,7 +203,7 @@ public class WorkoutBuilderPresenter {
         var b = g.getSets().get(setIndex + 1);
         g.getSets().set(setIndex, b);
         g.getSets().set(setIndex + 1, a);
-        touch();
+        markDirty();
     }
 
     public void replaceSet(int groupIndex, int setIndex, SwimSet newSet) {
@@ -214,23 +214,23 @@ public class WorkoutBuilderPresenter {
         if (setIndex < 0 || setIndex >= g.getSetCount()) return;
 
         g.getSets().set(setIndex, newSet);
-        touch();
+        markDirty();
     }
 
     // ---------- Helpers ----------
     // --- add these methods anywhere in the class body (e.g., after your set ops) ---
 
     /** Update name/notes from the header and persist. */
-    public void updateHeader(String name, String notes) {                   
-        Workout w = app.getCurrentWorkout();                                
-        if (w == null) return;                                              
-        w.setName(name == null ? "" : name.trim());                         
-        w.setNotes(notes == null ? "" : notes.trim());                      
-        w.setUpdatedAt(Instant.now());                                      
-        try { LocalStore.saveWorkout(w); } catch (Exception ignored) {}     
-        computeStats();                                                     
-        refreshTick.set(refreshTick.get() + 1);                             
-    }                                                                       
+    public void updateHeader(String name, String notes) {
+        Workout w = app.getCurrentWorkout();
+        if (w == null) return;
+        w.setName(name == null ? "" : name.trim());
+        w.setNotes(notes == null ? "" : notes.trim());
+        w.setUpdatedAt(Instant.now());
+        try { LocalStore.saveWorkout(w); } catch (Exception ignored) {}
+        computeStats();
+        refreshTick.set(refreshTick.get() + 1);
+    }
 
     /** Change pool length (Course)
      * Rounds each set's per-rep distance up to the nearest multiple of the pool length.
@@ -281,8 +281,7 @@ public class WorkoutBuilderPresenter {
 
         // Flip workout course and refresh
         w.setCourse(newCourse);
-        computeStats();
-        refreshTick.set(refreshTick.get() + 1);
+        markDirty();
     }
 
 
@@ -323,7 +322,7 @@ public class WorkoutBuilderPresenter {
         } else {
             groups.setAll(w.getGroups());
         }
-        dirty.set(false);     
+        dirty.set(false);
         bumpRefresh();
     }
 
@@ -335,7 +334,7 @@ public class WorkoutBuilderPresenter {
         }
         w.setUpdatedAt(Instant.now());
         LocalStore.saveWorkout(w);
-        dirty.set(false);     
+        dirty.set(false);
     }
 
     private void bumpRefresh() {
@@ -344,8 +343,15 @@ public class WorkoutBuilderPresenter {
 
     private void touch() {
         computeStats();
-        refreshTick.set(refreshTick.get() + 1);
-        dirty.set(true);      
+        bumpRefresh();
+    }
+
+    /**
+     * Marks the workout as dirty and refreshes the UI.
+     */
+    private void markDirty() {
+        dirty.set(true);
+        bumpRefresh();
     }
 
     private void persist(Workout w) {
@@ -354,6 +360,22 @@ public class WorkoutBuilderPresenter {
             LocalStore.saveWorkout(w);
         } catch (IOException ex) {
             ex.printStackTrace(); // TODO: surface to UI if you want
+        }
+    }
+
+    /**
+     * Persists the current workout from AppState, sets dirty to false, updates updatedAt, and bumps refresh.
+     */
+    public void persistCurrentWorkout() {
+        Workout w = app.getCurrentWorkout();
+        if (w == null) return;
+        try {
+            w.setUpdatedAt(Instant.now());
+            LocalStore.saveWorkout(w);
+            dirty.set(false);
+            bumpRefresh();
+        } catch (IOException ex) {
+            ex.printStackTrace(); // Optionally surface to UI
         }
     }
 

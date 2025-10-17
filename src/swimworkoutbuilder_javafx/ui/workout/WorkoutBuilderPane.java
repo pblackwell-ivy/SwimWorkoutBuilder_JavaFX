@@ -1,25 +1,26 @@
 package swimworkoutbuilder_javafx.ui.workout;
 
-
 import java.util.List;
 import java.util.Objects;
+
 import javafx.beans.property.ReadOnlyIntegerProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+
 import swimworkoutbuilder_javafx.model.SetGroup;
 import swimworkoutbuilder_javafx.model.SwimSet;
-import swimworkoutbuilder_javafx.model.enums.Course;
-import swimworkoutbuilder_javafx.state.AppState;
-import swimworkoutbuilder_javafx.ui.Icons;
-import swimworkoutbuilder_javafx.model.pacing.DefaultPacePolicy;
-import swimworkoutbuilder_javafx.model.pacing.PacePolicy;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.model.enums.Course;
 import swimworkoutbuilder_javafx.model.units.TimeSpan;
+import swimworkoutbuilder_javafx.model.pacing.PacePolicy;
+import swimworkoutbuilder_javafx.model.pacing.DefaultPacePolicy;
+
 import swimworkoutbuilder_javafx.state.AppState;
+import swimworkoutbuilder_javafx.ui.Icons;
 
 /**
  * Central “Workout Builder” pane.
@@ -115,8 +116,9 @@ public final class WorkoutBuilderPane {
 
         Button btnEdit = new Button();
         btnEdit.getStyleClass().setAll("button","secondary","sm","icon");
-        btnEdit.setGraphic(Icons.make("square-pen", 16));
+        btnEdit.setGraphic(Icons.make("pencil-swim-text", 16));
         btnEdit.setTooltip(new Tooltip("Edit group"));
+
 
         btnEdit.setOnAction(e -> {
             // Open dialog prefilled with the current group
@@ -136,8 +138,9 @@ public final class WorkoutBuilderPane {
         btnAddSet.setOnAction(e -> SetFormDialog.show(null)
                 .ifPresent(created -> presenter.addSet(gi, created)));
 
-        Button btnDel = new Button("🗑");
-        btnDel.getStyleClass().addAll("button","danger", "sm");
+        Button btnDel = new Button();
+        btnDel.getStyleClass().setAll("button","danger","sm","icon");
+        btnDel.setGraphic(Icons.make("trash-2-danger", 16));
         btnDel.setTooltip(new Tooltip("Delete group"));
         btnDel.setOnAction(e -> {
             Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
@@ -148,12 +151,23 @@ public final class WorkoutBuilderPane {
                 presenter.deleteGroup(gi);
         });
 
-        Button btnUp = new Button("↑");
-        btnUp.getStyleClass().addAll("button","secondary", "sm");
-        btnUp.setOnAction(e -> presenter.moveGroupUp(gi));
-        Button btnDown = new Button("↓");
-        btnDown.getStyleClass().addAll("button","secondary","sm");
+        Button btnUp = new Button();
+        btnUp.getStyleClass().setAll("button","secondary","sm","icon");
+        btnUp.setGraphic(Icons.make("move-up-swim-text", 16));
+        btnUp.setTooltip(new Tooltip("Move group up"));
+
+        Button btnDown = new Button();
+        btnDown.getStyleClass().setAll("button","secondary","sm","icon");
+        btnDown.setGraphic(Icons.make("move-down-swim-text", 16));
+        btnDown.setTooltip(new Tooltip("Move group down"));
         btnDown.setOnAction(e -> presenter.moveGroupDown(gi));
+
+        // Ensure layout doesn't reserve space when hidden
+        btnUp.managedProperty().bind(btnUp.visibleProperty());
+        btnDown.managedProperty().bind(btnDown.visibleProperty());
+        // Recompute visibility for first/last group
+        int groupCount = (presenter.groups() == null) ? 0 : presenter.groups().size();
+        applyNavVisibility(btnUp, btnDown, gi, groupCount);
 
         HBox titleBar = new HBox(8, lbl, spacer(), btnAddSet, btnEdit, btnUp, btnDown, btnDel);
         titleBar.setAlignment(Pos.CENTER_LEFT);
@@ -177,32 +191,50 @@ public final class WorkoutBuilderPane {
         Label lbl = new Label(formatSetLine(s));
         lbl.getStyleClass().add("label-set-primary");
 
-        Button btnEdit = new Button("✎");
-        btnEdit.getStyleClass().addAll("button","secondary","sm");
-
+        // --- icon buttons (graphics only) ---
+        // --- icon buttons (graphics only) ---
+// Use the same style pattern as SwimmerCard
+        Button btnEdit = new Button();
+        btnEdit.getStyleClass().setAll("button","secondary","sm","icon");
+        btnEdit.setGraphic(Icons.make("pencil-swim-text", 16));
         btnEdit.setTooltip(new Tooltip("Edit set"));
-        btnEdit.setOnAction(e -> SetFormDialog.show(s)
-                .ifPresent(edited -> presenter.replaceSet(gi, si, edited)));
+        btnEdit.setOnAction(e ->
+                SetFormDialog.show(s).ifPresent(edited -> presenter.replaceSet(gi, si, edited)));
 
-        Button btnUp = new Button("↑");
-        btnUp.getStyleClass().addAll("button","secondary", "sm");
+        Button btnUp = new Button();
+        btnUp.getStyleClass().setAll("button","secondary","sm","icon");
+        btnUp.setGraphic(Icons.make("move-up-swim-text", 16));
         btnUp.setTooltip(new Tooltip("Move set up"));
         btnUp.setOnAction(e -> presenter.moveSetUp(gi, si));
 
-        Button btnDown = new Button("↓");
-        btnDown.getStyleClass().addAll("button","secondary","sm");
+        Button btnDown = new Button();
+        btnDown.getStyleClass().setAll("button","secondary","sm","icon");
+        btnDown.setGraphic(Icons.make("move-down-swim-text", 16));
         btnDown.setTooltip(new Tooltip("Move set down"));
         btnDown.setOnAction(e -> presenter.moveSetDown(gi, si));
 
-        Button btnDelete = new Button("🗑");
-        btnDelete.getStyleClass().addAll("button","danger", "sm");
+        Button btnDelete = new Button();
+        btnDelete.getStyleClass().setAll("button","danger","sm","icon");
+        btnDelete.setGraphic(Icons.make("trash-2-danger", 16));
         btnDelete.setTooltip(new Tooltip("Delete set"));
         btnDelete.setOnAction(e -> presenter.deleteSet(gi, si));
 
-        HBox row = new HBox(8, lbl, spacer(), btnEdit, btnUp, btnDown, btnDelete);
-        row.getStyleClass().addAll("wb-set-row","row");          // 'row' enables subtle hover
+        // Do not let layout reserve space when hidden
+        btnUp.managedProperty().bind(btnUp.visibleProperty());
+        btnDown.managedProperty().bind(btnDown.visibleProperty());
+
+        // Determine how many sets are in this group right now
+        int setCount = 0;
+        List<SetGroup> allGroups = presenter.groups();
+        if (allGroups != null && gi >= 0 && gi < allGroups.size()) {
+            List<SwimSet> sets = allGroups.get(gi).getSets();
+            if (sets != null) setCount = sets.size();
+        }
+        applyNavVisibility(btnUp, btnDown, si, setCount); // first/last visibility
+
+        HBox row = new HBox(6, lbl, spacer(), btnEdit, btnUp, btnDown, btnDelete);
+        row.getStyleClass().addAll("wb-set-row","row");
         row.setAlignment(Pos.CENTER_LEFT);
-        row.getStyleClass().add("wb-set-row");
         return row;
     }
 
@@ -214,6 +246,24 @@ public final class WorkoutBuilderPane {
         Region r = new Region();
         HBox.setHgrow(r, Priority.ALWAYS);
         return r;
+    }
+
+    // Show/hide and manage() in sync so layout doesn’t reserve space.
+    private static void applyNavVisibility(Button up, Button down, int index, int size) {
+        boolean showUp   = index > 0;
+        boolean showDown = index < size - 1;
+
+        // Set visibility always
+        up.setVisible(showUp);
+        down.setVisible(showDown);
+
+        // Only set managed if it's not already bound (in some places we bind managed->visible)
+        if (!up.managedProperty().isBound()) {
+            up.setManaged(showUp);
+        }
+        if (!down.managedProperty().isBound()) {
+            down.setManaged(showDown);
+        }
     }
 
     private static String formatGroupTitle(SetGroup g) {
