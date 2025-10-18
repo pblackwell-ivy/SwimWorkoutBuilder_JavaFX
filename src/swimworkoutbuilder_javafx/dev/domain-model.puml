@@ -1,0 +1,210 @@
+@startuml
+title SwimWorkoutBuilder — Class Diagram (MVP)
+
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype polyline
+
+'========================
+' Packages
+'========================
+package "model" {
+  class Swimmer {
+    +id: UUID
+    +firstName: String
+    +lastName: String
+    +team: String
+    +seedTimes: Map<StrokeType, TimeSpan>
+  }
+
+  class Workout {
+    +id: UUID
+    +name: String
+    +notes: String
+    +course: Course
+    +createdAt: Instant
+    +updatedAt: Instant
+    +groups: List<SetGroup>
+    +totalDistance(): long
+    +totalSwimTime(): TimeSpan
+    +totalRestTime(): TimeSpan
+    +totalDuration(): TimeSpan
+  }
+
+  class SetGroup {
+    +name: String
+    +reps: int
+    +notes: String
+    +sets: List<SwimSet>
+  }
+
+  class SwimSet {
+    +stroke: StrokeType
+    +reps: int
+    +distancePerRep: Distance
+    +effort: Effort
+    +course: Course
+    +notes: String
+    +goalTime: TimeSpan
+    +equipment: Set<Equipment>
+  }
+
+  class Distance {
+    +ofYards(y: long): Distance
+    +ofMeters(m: long): Distance
+    +toYards(): double
+    +toMeters(): double
+  }
+
+  class TimeSpan {
+    +ofMinutesSecondsMillis(m: int, s: int, ms: int): TimeSpan
+    +toSeconds(): double
+    +toMillis(): long
+  }
+
+  enum Course {
+    SCY
+    SCM
+    LCM
+  }
+
+  enum Effort {
+    EASY
+    ENDURANCE
+    THRESHOLD
+    RACE_PACE
+    VO2_MAX
+    SPRINT
+  }
+
+  enum StrokeType {
+    FREESTYLE
+    BACKSTROKE
+    BREASTSTROKE
+    BUTTERFLY
+    INDIVIDUAL_MEDLEY
+    KICK
+    DRILL
+  }
+
+  enum Equipment {
+    FINS
+    PADDLES
+    KICK_BOARD
+    PULL_BUOY
+    SNORKEL
+    PARACHUTE
+    DRAG_SOCKS
+  }
+}
+
+package "pacing" {
+  interface PacePolicy {
+    +goalSeconds(workout: Workout, set: SwimSet, swimmer: Swimmer, idx: int): double
+    +intervalSeconds(workout: Workout, set: SwimSet, swimmer: Swimmer, idx: int): int
+  }
+  class DefaultPacePolicy implements PacePolicy
+  class SeedPace
+}
+
+package "store" {
+  class LocalStore {
+    +saveSwimmer(Swimmer)
+    +loadSwimmers(): List<Swimmer>
+    +saveWorkout(Swimmer, Workout)
+    +loadWorkouts(Swimmer): List<Workout>
+    +deleteWorkout(Swimmer, Workout)
+  }
+  class FilesUtil
+}
+
+package "state" {
+  class AppState {
+    +currentSwimmerProperty(): ObjectProperty<Swimmer>
+    +currentWorkoutProperty(): ObjectProperty<Workout>
+    +getSwimmers(): ObservableList<Swimmer>
+    +setCurrentSwimmer(Swimmer)
+    +setCurrentWorkout(Workout)
+    +persistCurrentWorkout()
+    +refreshSwimmerList()
+    -store: LocalStore
+  }
+}
+
+package "ui.workout" {
+  class WorkoutBuilderPresenter
+  class WorkoutHeaderPane
+  class WorkoutBuilderPane
+  class WorkoutPane
+  class SetFormDialog
+  class SetGroupFormDialog
+}
+
+package "ui.swimmers" {
+  class SwimmerPresenter
+  class SwimmerPane
+  class ManageSwimmersDialog
+}
+
+package "ui" {
+  class MainView
+  class Theme
+  class Icons
+}
+
+'========================
+' Relationships
+'========================
+
+Workout *-- SetGroup
+SetGroup *-- SwimSet
+SwimSet --> Distance
+SwimSet --> TimeSpan
+Swimmer "1" o-- "seedTimes" TimeSpan
+SwimSet --> StrokeType
+SwimSet --> Effort
+SwimSet --> Course
+SwimSet --> "0..*" Equipment
+
+PacePolicy <|.. DefaultPacePolicy
+DefaultPacePolicy ..> SeedPace
+DefaultPacePolicy ..> Swimmer
+DefaultPacePolicy ..> Workout
+DefaultPacePolicy ..> SwimSet
+
+AppState o-- LocalStore
+LocalStore ..> FilesUtil
+AppState "1" *-- "current" Swimmer
+AppState "1" *-- "current" Workout
+AppState --> "swimmers" Swimmer
+AppState ..> Workout
+AppState ..> Swimmer
+
+WorkoutBuilderPresenter ..> AppState
+WorkoutHeaderPane ..> WorkoutBuilderPresenter
+WorkoutBuilderPane ..> WorkoutBuilderPresenter
+WorkoutPane o-- WorkoutHeaderPane
+WorkoutPane o-- WorkoutBuilderPane
+SwimmerPresenter ..> AppState
+SwimmerPane ..> SwimmerPresenter
+ManageSwimmersDialog ..> AppState
+
+MainView ..> SwimmerPane
+MainView ..> WorkoutPane
+MainView ..> Theme
+MainView ..> Icons
+
+note right of WorkoutHeaderPane
+  Binds to presenter refresh tick
+  and AppState.currentWorkout
+  to display totals (dist/time).
+end note
+
+note right of WorkoutBuilderPane
+  Renders groups & sets.
+  Opens SetFormDialog/SetGroupFormDialog.
+  Shows equipment icons in rows.
+end note
+
+@enduml
