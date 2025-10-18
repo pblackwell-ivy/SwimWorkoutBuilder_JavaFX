@@ -1,5 +1,7 @@
 SwimWorkoutBuilder (JavaFX-only)
 
+This project demonstrates a complete end-to-end JavaFX application following MVVM architecture principles, using observable state, modular presenters, and persistable domain models. The user interface is fully responsive, themeable, and adheres to consistent design conventions.
+
 A desktop MVP for creating structured swim workouts. Coaches (or swimmers) can create swimmers with seed times, then build workouts composed of groups and sets. The app computes goal and interval times from seed times, stroke, effort, equipment, and pool length.
 
 Tech: Java 21+ (tested with JDK 24), JavaFX 21, Gradle/Maven not required (IntelliJ run config OK).
