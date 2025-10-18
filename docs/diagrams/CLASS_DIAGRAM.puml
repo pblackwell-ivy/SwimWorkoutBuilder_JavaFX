@@ -1,0 +1,33 @@
+@startuml
+skinparam ranksep 24
+skinparam nodesep 24
+class AppState
+class LoadWorkoutDialog
+class LocalStore
+class ManageSwimmersDialog
+class SetGroup
+class SetGroupFormDialog
+class SwimSet
+class Swimmer
+class SwimmerCard
+class SwimmerFormDialog
+class SwimmerPane
+class SwimmerRepository
+class Workout
+class WorkoutBuilderPane
+class WorkoutBuilderPresenter
+class WorkoutEditorState
+class WorkoutFormDialog
+class WorkoutHeaderPane
+class WorkoutPane
+class WorkoutPersistenceProbe
+class WorkoutPresenter
+class WorkoutPrinter
+{
+}
+Workout "1" o-- "*" SetGroup
+SetGroup "1" o-- "*" SwimSet
+AppState --> Workout : current
+AppState --> Swimmer : current
+AppState --> LocalStore : persistence
+@enduml
