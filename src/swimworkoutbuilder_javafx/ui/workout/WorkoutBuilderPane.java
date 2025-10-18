@@ -244,7 +244,7 @@ public final class WorkoutBuilderPane {
         }
         applyNavVisibility(btnUp, btnDown, si, setCount);
 
-        HBox row = new HBox(6, lbl, notesLbl, spacer(), btnEdit, btnUp, btnDown, btnDelete);
+        HBox row = new HBox(6, lbl, notesLbl, eqIcons, spacer(), btnEdit, btnUp, btnDown, btnDelete);
         row.getStyleClass().addAll("wb-set-row","row");
         row.setAlignment(Pos.CENTER_LEFT);
         return row;
