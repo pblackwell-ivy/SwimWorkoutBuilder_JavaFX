@@ -16,28 +16,15 @@ import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.store.LocalStore;
 import swimworkoutbuilder_javafx.ui.Theme;
 /**
- * [Dialog] LoadWorkoutDialog for the "dialogs" feature.
+ * Dialog that presents the list of workouts for the selected / current swimmer.
  *
  * <p><b>Responsibilities:</b>
  * <ul>
- *   <li>Collect user input with clear primary/secondary actions</li>
- *   <li>Validate inputs and surface errors accessibly</li>
+ *   <li>Verify that a swimmer has been selected</li>
+ *   <li>Display available workouts (name, notes) from LocalStore</li>
+ *   <li>Enables user to open a workout or cancel</li>
  *   <li>Return a result to the caller</li>
  * </ul>
- *
- * <p><b>Design Notes:</b>
- * <ul>
- *   <li>Follows canonical roles (primary/secondary/tertiary/destructive)</li>
- *   <li>ESC/Enter keys match platform expectations</li>
- *   <li>Validation separated from presentation</li>
- * </ul>
- *
- * <p><b>Usage Example:</b>
- * <pre>{@code
- * // Typical usage for LoadWorkoutDialog
- * LoadWorkoutDialog obj = new LoadWorkoutDialog();
- * obj.toString(); // replace with real usage
- * }</pre>
  *
  * @author Parker Blackwell
  * @version 1.0

@@ -33,8 +33,11 @@ public final class SeedGridPane extends BorderPane {
     private static final double YARD_TO_METER = 0.9144;
     private static final double METER_TO_YARD = 1.0 / 0.9144;
 
+    private static final int DEFAULT_DISPLAY_SECONDS = 120; // 2:00 default
+
     private final GridPane seedGrid = new GridPane();
     private final Label title = new Label("Seed Times");
+    private final Label hintLabel = new Label("Tip: enter times as seconds or mm:ss.hh. Leave blank to clear.");
 
     // Header action buttons (need to be fields because wireState() binds to them)
     private Button btnEdit;
@@ -79,6 +82,14 @@ public final class SeedGridPane extends BorderPane {
 
         // — Title + actions in a single header row
         title.getStyleClass().add("card-title");
+        hintLabel.getStyleClass().add("muted");
+        hintLabel.setWrapText(true);
+        hintLabel.setVisible(false);
+        hintLabel.setManaged(false);
+        hintLabel.setMaxWidth(Double.MAX_VALUE);
+        hintLabel.maxWidthProperty().bind(seedGrid.widthProperty());
+        hintLabel.setPadding(new Insets(4, 0, 0, 0)); // small spacing above
+        VBox.setVgrow(hintLabel, Priority.NEVER);
 
         btnEdit = new Button();
         btnEdit.getStyleClass().setAll("button","secondary","sm","icon");
@@ -138,9 +149,10 @@ public final class SeedGridPane extends BorderPane {
         c1.setHgrow(Priority.NEVER);
         c1.setHalignment(HPos.CENTER);
         seedGrid.getColumnConstraints().setAll(c0, c1);
+        seedGrid.setAlignment(Pos.TOP_CENTER);
 
         // — Stack content vertically (no bottom button row needed anymore)
-        VBox content = new VBox(6, header, unitBox, seedGrid);
+        VBox content = new VBox(6, header, unitBox, seedGrid, hintLabel);
         content.setFillWidth(false);
         content.setAlignment(Pos.TOP_CENTER);
         setCenter(content);
@@ -218,10 +230,14 @@ public final class SeedGridPane extends BorderPane {
                 setRoles(btnEdit, "ghost", "sm", "icon");     // fades while editing
                 setRoles(btnSave, "primary", "sm", "icon");   // main action
                 setRoles(btnCancel, "secondary", "sm", "icon");
+                hintLabel.setVisible(true);
+                hintLabel.setManaged(true);
             } else {
                 setRoles(btnEdit, "secondary", "sm", "icon"); // single action visible
                 setRoles(btnSave, "ghost", "sm", "icon");
                 setRoles(btnCancel, "ghost", "sm", "icon");
+                hintLabel.setVisible(false);
+                hintLabel.setManaged(false);
             }
         });
 
@@ -277,11 +293,14 @@ public final class SeedGridPane extends BorderPane {
         for (var e : fields.entrySet()) {
             StrokeType st = e.getKey();
             TimeSpan canonical100m = readCanonical100m(boundSwimmer, st); // from model (m canonical)
-            String txt = "";
+            String txt;
             if (canonical100m != null) {
                 double canonSec = canonical100m.toMillis() / 1000.0;
                 double dispSec = convertCanonicalToDisplaySeconds(canonSec, displayUnit.get());
                 txt = formatTimeSeconds(dispSec);
+            } else {
+                // No value in the model → show 2:00 by default (in CURRENT display units)
+                txt = formatTimeSeconds(DEFAULT_DISPLAY_SECONDS);
             }
             e.getValue().setText(txt);
         }

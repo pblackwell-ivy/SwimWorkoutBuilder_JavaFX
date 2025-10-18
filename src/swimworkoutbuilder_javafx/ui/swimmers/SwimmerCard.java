@@ -22,20 +22,17 @@ public final class SwimmerCard {
 
     private final VBox root = new VBox(10);
 
-    // --- fields/labels ---
     private final TextField tfFirst = new TextField();
     private final TextField tfLast  = new TextField();
     private final TextField tfTeam  = new TextField();
     private final Label lblCreated  = new Label();
     private final Label lblUpdated  = new Label();
 
-    // --- actions (icon only) ---
     private final Button btnEdit   = new Button();
     private final Button btnSave   = new Button();
     private final Button btnCancel = new Button();
     private final Button btnDelete = new Button();
 
-    // local mode
     private final BooleanProperty editing = new SimpleBooleanProperty(false);
 
     public SwimmerCard() {
@@ -46,25 +43,18 @@ public final class SwimmerCard {
 
     public Node node() { return root; }
 
-    /** Allow host to refresh the Updated label (e.g., after seed save). */
     public void refreshUpdatedFromApp() {
         var s = AppState.get().getCurrentSwimmer();
         lblUpdated.setText(s != null ? DateFmt.local(s.getUpdatedAt()) : "—");
     }
 
-    // ---------------------------------------------------------------------
-    // UI
-    // ---------------------------------------------------------------------
     private void buildUI() {
-
-        // Header: "Current swimmer" + actions to the right
         Label cardTitle = new Label("Current Swimmer");
         cardTitle.getStyleClass().add("card-title");
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Buttons: classes + icons + tooltips
         btnEdit.getStyleClass().setAll("button","secondary","sm","icon");
         btnSave.getStyleClass().setAll("button","primary","sm","icon");
         btnCancel.getStyleClass().setAll("button","secondary","sm","icon");
@@ -89,12 +79,9 @@ public final class SwimmerCard {
         header.setAlignment(Pos.CENTER_LEFT);
         header.getStyleClass().add("card-header");
 
-
-        // Form grid
         GridPane swimmerForm = new GridPane();
         ColumnConstraints c0 = new ColumnConstraints();
         c0.setMinWidth(60);
-        // c0.setPrefWidth(100);
         c0.setHgrow(Priority.NEVER);
         ColumnConstraints c1 = new ColumnConstraints();
         c1.setHgrow(Priority.ALWAYS);
@@ -136,9 +123,6 @@ public final class SwimmerCard {
         tfLast.setMaxWidth(Double.MAX_VALUE);
         tfTeam.setMaxWidth(Double.MAX_VALUE);
 
-
-
-        // Visibility by mode (managed follows visible to prevent gaps)
         btnEdit.visibleProperty().bind(editing.not());
         btnEdit.managedProperty().bind(btnEdit.visibleProperty());
         btnDelete.visibleProperty().bind(editing.not());
@@ -159,9 +143,6 @@ public final class SwimmerCard {
         editing.set(false);
     }
 
-    // ---------------------------------------------------------------------
-    // State & actions
-    // ---------------------------------------------------------------------
     private void wireState() {
         var app = AppState.get();
 
@@ -180,7 +161,6 @@ public final class SwimmerCard {
             }
         });
 
-        // Initial
         var s0 = app.getCurrentSwimmer();
         if (s0 == null && !app.getSwimmers().isEmpty()) {
             s0 = app.getSwimmers().get(0);
@@ -242,9 +222,6 @@ public final class SwimmerCard {
         });
     }
 
-    // ---------------------------------------------------------------------
-    // Helpers
-    // ---------------------------------------------------------------------
     private void setFormEditable(boolean editable) {
         tfFirst.setEditable(editable);
         tfLast.setEditable(editable);
@@ -263,16 +240,21 @@ public final class SwimmerCard {
         tfTeam.setText(s.getTeamName());
     }
 
+    /** Preserve seed times and other properties; only change name/team. */
     private Swimmer applyEdits(Swimmer base) {
         if (base == null) return null;
-        return new Swimmer(
-                base.getId(),
-                tfFirst.getText().trim(),
-                tfLast.getText().trim(),
-                /* preferredName (MVP removed) */ null,
-                tfTeam.getText().trim(),
-                base.getCreatedAt(),
-                java.time.Instant.now()
-        );
+
+        // Keep the same id, timestamps, AND existing seed paces by copying first
+        Swimmer updated = new Swimmer(base); // uses your copy constructor
+
+        updated.setFirstName(tfFirst.getText().trim());
+        updated.setLastName(tfLast.getText().trim());
+        updated.setPreferredName(null); // or keep if you re-enable the field
+        updated.setTeamName(tfTeam.getText().trim());
+        // preserve createdAt; just refresh updatedAt
+        updated.setUpdatedAt(java.time.Instant.now());
+
+        // IMPORTANT: seed paces already preserved by the copy constructor
+        return updated;
     }
 }

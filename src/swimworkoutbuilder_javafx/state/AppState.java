@@ -88,6 +88,7 @@ public final class AppState implements Serializable {
     // ------------------------------------------------------------
     public ObservableList<Swimmer> getSwimmers() { return swimmers.get(); }
     public void setSwimmers(ObservableList<Swimmer> value) { swimmers.set(value); }
+
     public ObjectProperty<ObservableList<Swimmer>> swimmersProperty() { return swimmers; }
 
     // ------------------------------------------------------------
@@ -95,6 +96,7 @@ public final class AppState implements Serializable {
     // ------------------------------------------------------------
     public Swimmer getCurrentSwimmer() { return currentSwimmer.get(); }
     public void setCurrentSwimmer(Swimmer value) { currentSwimmer.set(value); }
+
     public ObjectProperty<Swimmer> currentSwimmerProperty() { return currentSwimmer; }
 
     // ------------------------------------------------------------
@@ -102,6 +104,7 @@ public final class AppState implements Serializable {
     // ------------------------------------------------------------
     public Workout getCurrentWorkout() { return currentWorkout.get(); }
     public void setCurrentWorkout(Workout value) { currentWorkout.set(value); }
+
     public ObjectProperty<Workout> currentWorkoutProperty() { return currentWorkout; }
 
     // ------------------------------------------------------------

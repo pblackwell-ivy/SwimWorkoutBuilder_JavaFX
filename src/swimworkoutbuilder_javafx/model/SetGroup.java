@@ -4,11 +4,14 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 /**
- * A logical collection of SwimSets that may repeat.
- * Supports rest between sets (inside the group) and rest between group repeats.
+ * Structured workouts are made up of one or more {@code SetGroup}s that contain one or more {@code SwimSet}s.
+ * SetGroups are ordered and may be repeated. Supports the logic for defining rests between the sets in a group
+ * and between the groups themselves.
+ *
+ * A SetGroup defines the name of the group (e.g., Warmup, Main, Cooldown), the number of repetitions, the order
+ * relative to other groups, and may include an optional "notes" that typically are used for contextual information.
  */
 public class SetGroup implements Serializable {
     private static final long serialVersionUID = 1L;

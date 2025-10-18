@@ -59,7 +59,7 @@ public class Main extends Application {
 
         // --- Scene setup ---
         Scene scene = new Scene(root, 1180, 720);
-        Theme.apply(scene);
+        Theme.apply(scene);         // Global helper to apply CSS theme
 
         // --- Stage setup ---
         stage.setTitle("SwimWorkoutBuilder (JavaFX-only)");

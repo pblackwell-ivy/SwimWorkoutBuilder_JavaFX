@@ -1,13 +1,15 @@
 package swimworkoutbuilder_javafx.ui.workout;
 
-
 import java.util.Objects;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ReadOnlyStringProperty;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.layout.*;
 import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.model.enums.Course;
@@ -16,24 +18,42 @@ import swimworkoutbuilder_javafx.ui.DateFmt;
 import swimworkoutbuilder_javafx.ui.Icons;
 
 /**
- * Workout header
- * Row 1: Title ............. [✎][🗑]
- * Row 2: Notes
- * Row 3: Pool length radios  | Distance | Duration | Swim | Rest |
- * Row 4: Created • Updated
+ * WorkoutHeaderPane
+ *
+ * Visual + interaction model for the workout header area.
+ *
+ * Layout philosophy:
+ * - Row A (global bar):  "Current Workout"  [Unsaved chip]   …………………  [Save] [Delete]
+ *   • Save/Delete here apply to the ENTIRE workout (header + groups/sets).
+ *   • The Unsaved chip reflects the presenter's dirty flag.
+ * - Row B: Name + header edit actions (Edit/Cancel/Save) — these affect ONLY name/notes/course.
+ *   • Header Save applies edits to the model and marks the workout dirty, but does not persist.
+ * - Row C: Notes (view/edit swap)
+ * - Row D: Course radios on the left, stats chips on the right
+ * - Row E: Timestamps
  */
 public final class WorkoutHeaderPane {
 
-    private final VBox root = new VBox(10);
+    private final VBox root = new VBox(6);
     private final AppState app;
 
-    // Display labels (view mode)
-    private final Label lblTitle = new Label();
+    // --- view widgets ---
+    private final Label titleBarLabel = new Label("Current Workout");
+    private final Label chipUnsaved   = new Label("Unsaved");
+
+    private final Button btnSaveGlobal = new Button();   // persists entire workout
+    private final Button btnDelete     = new Button();
+
+    // Header (name/notes) view/edit swap
+    private final Label lblName  = new Label();
     private final Label lblNotes = new Label();
 
-    // Edit fields (edit mode)
-    private final TextField tfTitle = new TextField();
+    private final TextField tfName  = new TextField();
     private final TextField tfNotes = new TextField();
+
+    private final Button btnEditHeader   = new Button();
+    private final Button btnSaveHeader   = new Button();
+    private final Button btnCancelHeader = new Button();
 
     // Course radios
     private final ToggleGroup tgCourse = new ToggleGroup();
@@ -50,16 +70,12 @@ public final class WorkoutHeaderPane {
     // Timestamps
     private final Label lblTimestamps = new Label();
 
-    // Actions
-    private final Button btnEdit   = new Button();
-    private final Button btnDelete = new Button();
-    private final Button btnSave   = new Button();
-    private final Button btnCancel = new Button();
-    private final Button btnSaveDirty = new Button();   // global save button that apppears when the workout is dirty
-    private final Label chipUnsaved = new Label("Unsaved"); // subtle chip next to the title
-
-    private boolean editing = false;
+    // External
     private WorkoutBuilderPresenter presenter;
+    private boolean editingHeader = false;
+
+    // Local dirty flag for header UI (decoupled from presenter impl)
+    private final BooleanProperty headerDirty = new SimpleBooleanProperty(false);
 
     public WorkoutHeaderPane(AppState app) {
         this.app = Objects.requireNonNull(app, "app");
@@ -70,158 +86,149 @@ public final class WorkoutHeaderPane {
 
     public Node node() { return root; }
 
-    /** Presenter binding for live stats + course changes. */
+    /** Bind a presenter so we can reflect live stats and dirty state. */
     public void bindPresenter(WorkoutBuilderPresenter p) {
+        // --- Unbind any prior presenter-related bindings ---
+        try { chipUnsaved.visibleProperty().unbind(); } catch (Exception ignored) {}
+        try { btnSaveGlobal.visibleProperty().unbind(); } catch (Exception ignored) {}
+        try { statDistance.textProperty().unbind(); } catch (Exception ignored) {}
+        try { statDuration.textProperty().unbind(); } catch (Exception ignored) {}
+        try { statSwim.textProperty().unbind(); } catch (Exception ignored) {}
+        try { statRest.textProperty().unbind(); } catch (Exception ignored) {}
+
         this.presenter = p;
         if (p == null) return;
-        if (p != null) {
-            // Show “Unsaved” chip and the Save Workout button whenever dirty
-            chipUnsaved.visibleProperty().bind(p.dirtyProperty());
-            btnSaveDirty.visibleProperty().bind(p.dirtyProperty());
-        }
 
-        // Live redraw when groups/sets change
-        p.refreshTickProperty().addListener((o, a, b) -> refreshFrom(app.getCurrentWorkout()));
+        // Reset UI dirty on new bind
+        headerDirty.set(false);
 
-        // Update stats when any computed text changes
-        ReadOnlyStringProperty td = p.totalDistanceTextProperty();
-        ReadOnlyStringProperty du = p.durationTextProperty();
-        ReadOnlyStringProperty sw = p.swimTimeTextProperty();
-        ReadOnlyStringProperty rs = p.restTimeTextProperty();
+        // Unsaved chip + global Save now reflect this local flag
+        chipUnsaved.visibleProperty().bind(headerDirty);
+        btnSaveGlobal.visibleProperty().bind(headerDirty);
 
-        td.addListener((o, a, b) -> updateStats(app.getCurrentWorkout()));
-        du.addListener((o, a, b) -> updateStats(app.getCurrentWorkout()));
-        sw.addListener((o, a, b) -> updateStats(app.getCurrentWorkout()));
-        rs.addListener((o, a, b) -> updateStats(app.getCurrentWorkout()));
+        // --- Bind stats labels directly to presenter string properties, but format time as mm:ss ---
+        statDistance.textProperty().bind(p.totalDistanceTextProperty());
+        statDuration.textProperty().bind(Bindings.createStringBinding(
+                () -> mmssOnly(p.durationTextProperty().get()),
+                p.durationTextProperty()));
+        statSwim.textProperty().bind(Bindings.createStringBinding(
+                () -> mmssOnly(p.swimTimeTextProperty().get()),
+                p.swimTimeTextProperty()));
+        statRest.textProperty().bind(Bindings.createStringBinding(
+                () -> mmssOnly(p.restTimeTextProperty().get()),
+                p.restTimeTextProperty()));
 
-        // Initial stats
-        updateStats(app.getCurrentWorkout());
+        // Any structural workout change → mark dirty (header shows Unsaved)
+        p.refreshTickProperty().addListener((o, a, b) -> headerDirty.set(true));
     }
 
     // ------------------------------------------------------------------
     // UI
     // ------------------------------------------------------------------
     private void buildUI() {
-        root.setPadding(new Insets(10));
-        root.getStyleClass().add("surface");
+        root.setPadding(new Insets(8, 12, 8, 12));
+        root.getStyleClass().setAll("card");
 
         // Styles
-        lblTitle.getStyleClass().add("workout-title");
+        titleBarLabel.getStyleClass().add("card-title");
+        lblName.getStyleClass().add("workout-title");
         lblNotes.getStyleClass().add("workout-notes");
-
-        // AFTER — match SwimmerCard style and use your new PNGs
-        btnEdit.getStyleClass().setAll("button","secondary","sm","icon");
-        btnDelete.getStyleClass().setAll("button","danger","sm","icon");
-        btnSave.getStyleClass().setAll("button","accent","sm");
-        btnCancel.getStyleClass().setAll("button","secondary","sm");
 
         chipUnsaved.getStyleClass().add("chip");
         chipUnsaved.setVisible(false);
         chipUnsaved.managedProperty().bind(chipUnsaved.visibleProperty());
 
-        // Global Save button (always-on when dirty)
-        // NOTE: do NOT add the "icon" class here — it forces a transparent background.
-        btnSaveDirty.getStyleClass().setAll("button","primary","sm");
-        btnSaveDirty.setGraphic(Icons.make("save-white", 16));
-        btnSaveDirty.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-        btnSaveDirty.setTooltip(new Tooltip("Save workout (⌘S / Ctrl+S)"));
-        btnSaveDirty.setVisible(false);
-        btnSaveDirty.managedProperty().bind(btnSaveDirty.visibleProperty());
+        // Global actions
+        btnSaveGlobal.getStyleClass().setAll("button","primary","sm"); // NOT "icon" (we want filled button)
+        btnSaveGlobal.setGraphic(Icons.make("save-white", 16));
+        btnSaveGlobal.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        btnSaveGlobal.setTooltip(new Tooltip("Save workout (⌘S / Ctrl+S)"));
+        btnSaveGlobal.setVisible(false);
+        btnSaveGlobal.managedProperty().bind(btnSaveGlobal.visibleProperty());
 
+        btnDelete.getStyleClass().setAll("button","danger","sm","icon");
+        btnDelete.setGraphic(Icons.make("trash-2-danger", 16));
+        btnDelete.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        btnDelete.setTooltip(new Tooltip("Delete workout"));
 
-        // icons (all live in /resources/icons)
-        btnEdit.setGraphic(Icons.make("pencil-swim-text", 16));
-        btnDelete.setGraphic(Icons.make("trash-2-danger", 16));   // use danger variant for destructive
-        btnSave.setGraphic(Icons.make("save-swim-text", 16));
-        btnCancel.setGraphic(Icons.make("circle-x-swim-text", 16));
+        // Header edit actions
+        btnEditHeader.getStyleClass().setAll("button","secondary","sm","icon");
+        btnSaveHeader.getStyleClass().setAll("button","secondary","sm","icon");
+        btnCancelHeader.getStyleClass().setAll("button","secondary","sm","icon");
+        btnEditHeader.setGraphic(Icons.make("pencil-swim-text", 16));
+        btnSaveHeader.setGraphic(Icons.make("save-swim-text", 16));
+        btnCancelHeader.setGraphic(Icons.make("circle-x-swim-text", 16));
+        btnEditHeader.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        btnSaveHeader.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        btnCancelHeader.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
 
-        // ensure icon-only
-        btnEdit.setText(null);
-        btnDelete.setText(null);
-        btnSave.setText(null);
-        btnCancel.setText(null);
-
-        // optional: keep focus ring off for compact toolbar icons
-        for (Button b : new Button[]{btnEdit, btnDelete, btnSave, btnCancel, btnSaveDirty}) {
+        for (Button b : new Button[]{btnSaveGlobal, btnDelete, btnEditHeader, btnSaveHeader, btnCancelHeader}) {
             b.setFocusTraversable(false);
         }
 
-        // (your visibility bindings for edit/view modes can remain as-is)
-        // Show the chip next to the title
-        HBox titleWithChip = new HBox(6, lblTitle, chipUnsaved);
-        titleWithChip.setAlignment(Pos.CENTER_LEFT);
+        // Row A: Global title + unsaved chip + global buttons
+        HBox leftA = new HBox(8, titleBarLabel, chipUnsaved);
+        leftA.setAlignment(Pos.CENTER_LEFT);
+        Region spacerA = new Region(); HBox.setHgrow(spacerA, Priority.ALWAYS);
+        HBox rightA = new HBox(8, btnSaveGlobal, btnDelete);
+        rightA.setAlignment(Pos.CENTER_RIGHT);
+        HBox rowA = new HBox(10, leftA, spacerA, rightA);
+        rowA.setAlignment(Pos.CENTER_LEFT);
+        rowA.getStyleClass().setAll("card-header");
 
-        // Row 1: Title (label in view mode) + actions at right
-        HBox row1 = new HBox(10);
-        Region spacer1 = new Region(); HBox.setHgrow(spacer1, Priority.ALWAYS);
-        HBox actionsView = new HBox(8, btnSaveDirty, btnEdit, btnDelete);
-        HBox actionsEdit = new HBox(8, btnCancel, btnSave);
-        actionsEdit.setVisible(false);
-        actionsEdit.managedProperty().bind(actionsEdit.visibleProperty());
-        actionsView.managedProperty().bind(actionsView.visibleProperty());
-        row1.getChildren().addAll(titleWithChip, spacer1, actionsView, actionsEdit);
-        row1.setAlignment(Pos.CENTER_LEFT);
-        row1.getStyleClass().add("toolbar");
+        // Row B: Name with header edit controls
+        HBox leftB = new HBox(6, wrapSwap(lblName, tfName));
+        leftB.setAlignment(Pos.CENTER_LEFT);
+        Region spacerB = new Region(); HBox.setHgrow(spacerB, Priority.ALWAYS);
+        HBox headerActionsView = new HBox(8, btnEditHeader);
+        HBox headerActionsEdit = new HBox(8, btnCancelHeader, btnSaveHeader);
+        headerActionsEdit.setVisible(false);
+        headerActionsEdit.managedProperty().bind(headerActionsEdit.visibleProperty());
+        headerActionsView.managedProperty().bind(headerActionsView.visibleProperty());
+        HBox rowB = new HBox(10, leftB, spacerB, headerActionsView, headerActionsEdit);
+        rowB.setAlignment(Pos.CENTER_LEFT);
 
-        // Row 2: Notes (label in view mode)
-        HBox row2 = new HBox(lblNotes);
-        row2.setAlignment(Pos.CENTER_LEFT);
+        // Row C: Notes (swap)
+        HBox rowC = new HBox(wrapSwap(lblNotes, tfNotes));
+        rowC.setAlignment(Pos.CENTER_LEFT);
 
-        // Row 3: Pool length + stats
+        // Row D: course + stats
         rbSCY.setToggleGroup(tgCourse);
         rbSCM.setToggleGroup(tgCourse);
         rbLCM.setToggleGroup(tgCourse);
-
         HBox radios = new HBox(10, new Label("Pool length:"), rbSCY, rbSCM, rbLCM);
         radios.setAlignment(Pos.CENTER_LEFT);
 
-        HBox stats = new HBox(14,
-                chip(statDistance), sep(), chip(statDuration), sep(), chip(statSwim), sep(), chip(statRest));
+        HBox stats = new HBox(14, chip(statDistance), sep(), chip(statDuration), sep(), chip(statSwim), sep(), chip(statRest));
         stats.setAlignment(Pos.CENTER_RIGHT);
 
-        HBox row3 = new HBox(10, radios);
-        Region spacer3 = new Region(); HBox.setHgrow(spacer3, Priority.ALWAYS);
-        row3.getChildren().addAll(spacer3, stats);
-        row3.setAlignment(Pos.CENTER_LEFT);
-        row3.getStyleClass().add("toolbar");
+        Region spacerD = new Region(); HBox.setHgrow(spacerD, Priority.ALWAYS);
+        HBox rowD = new HBox(10, radios, spacerD, stats);
+        rowD.setAlignment(Pos.CENTER_LEFT);
+        rowD.getStyleClass().add("toolbar");
 
-        // Row 4: timestamps
+        // Row E: timestamps
         lblTimestamps.getStyleClass().add("muted");
-        HBox row4 = new HBox(lblTimestamps);
-        row4.setAlignment(Pos.CENTER_LEFT);
+        HBox rowE = new HBox(lblTimestamps);
+        rowE.setAlignment(Pos.CENTER_LEFT);
 
-        // Edit widgets (hidden until editing)
-        tfTitle.setPromptText("Workout name");
+        // Edit visibility defaults
+        tfName.setPromptText("Workout name");
         tfNotes.setPromptText("Notes (optional)");
-        tfTitle.setVisible(false); tfTitle.setManaged(false);
+        tfName.setVisible(false); tfName.setManaged(false);
         tfNotes.setVisible(false); tfNotes.setManaged(false);
 
-        // Insert edit fields in place (they’ll be toggled with labels)
-        // Row 1: swap lblTitle <-> tfTitle
-        row1.getChildren().remove(lblTitle);
-        row1.getChildren().add(0, wrapSwap(lblTitle, tfTitle));
-        // Row 2: swap lblNotes <-> tfNotes
-        row2.getChildren().clear();
-        row2.getChildren().add(wrapSwap(lblNotes, tfNotes));
-
         // Assemble
-        root.getChildren().setAll(row1, row2, row3, row4);
+        root.getChildren().setAll(rowA, rowB, rowC, rowD, rowE);
 
-        // Actions
-        btnEdit.setOnAction(e -> enterEdit(actionsView, actionsEdit));
-        btnCancel.setOnAction(e -> { refreshFrom(app.getCurrentWorkout()); exitEdit(actionsView, actionsEdit); });
-        btnSave.setOnAction(e -> onSave(actionsView, actionsEdit));
+        // Actions ------------------------------------------------------
+        btnEditHeader.setOnAction(e -> enterHeaderEdit(headerActionsView, headerActionsEdit));
+        btnCancelHeader.setOnAction(e -> { refreshFrom(app.getCurrentWorkout()); exitHeaderEdit(headerActionsView, headerActionsEdit); });
+        btnSaveHeader.setOnAction(e -> onSaveHeader(headerActionsView, headerActionsEdit));
         btnDelete.setOnAction(e -> onDelete());
-        btnSaveDirty.setOnAction(e -> {
-            try {
-                app.persistCurrentWorkout();
-                refreshFrom(app.getCurrentWorkout());
-            } catch (Exception ex) {
-                new Alert(Alert.AlertType.ERROR, "Failed to save workout:\n" + ex.getMessage(), ButtonType.OK).showAndWait();
-            }
-        });
+        btnSaveGlobal.setOnAction(e -> onSaveGlobal());
 
-        // Course changes apply immediately (always enabled)
+        // Course change applies immediately at the model level (marks dirty and re-computes)
         tgCourse.selectedToggleProperty().addListener((obs, o, n) -> {
             if (presenter == null) return;
             Course c = selectedCourse();
@@ -236,70 +243,67 @@ public final class WorkoutHeaderPane {
                 app.currentWorkoutProperty()));
 
         // Refresh on workout switch
-        app.currentWorkoutProperty().addListener((o, oldW, newW) -> refreshFrom(newW));
+        app.currentWorkoutProperty().addListener((o, oldW, newW) -> {
+            refreshFrom(newW);
+            headerDirty.set(false); // a freshly loaded workout starts pristine
+            // updateStats(); // no longer needed immediately after binding
+        });
     }
 
     // ------------------------------------------------------------------
-    // Edit mode
+    // Header edit mode
     // ------------------------------------------------------------------
-    private void enterEdit(HBox actionsView, HBox actionsEdit) {
-        editing = true;
+    private void enterHeaderEdit(HBox actionsView, HBox actionsEdit) {
+        editingHeader = true;
         swapToEdit(true);
         actionsView.setVisible(false);
         actionsEdit.setVisible(true);
-        tfTitle.requestFocus();
+        tfName.requestFocus();
     }
 
-    private void exitEdit(HBox actionsView, HBox actionsEdit) {
-        editing = false;
+    private void exitHeaderEdit(HBox actionsView, HBox actionsEdit) {
+        editingHeader = false;
         swapToEdit(false);
         actionsEdit.setVisible(false);
         actionsView.setVisible(true);
     }
 
     private void swapToEdit(boolean on) {
-        // Title
-        lblTitle.setVisible(!on); lblTitle.setManaged(!on);
-        tfTitle.setVisible(on);  tfTitle.setManaged(on);
-        // Notes
+        lblName.setVisible(!on); lblName.setManaged(!on);
+        tfName.setVisible(on);  tfName.setManaged(on);
         lblNotes.setVisible(!on); lblNotes.setManaged(!on);
         tfNotes.setVisible(on);  tfNotes.setManaged(on);
     }
 
-    private void onSave(HBox actionsView, HBox actionsEdit) {
-        if (presenter == null) {
-            exitEdit(actionsView, actionsEdit);
-            return;
-        }
+    /** Apply name/notes/course edits to the model and mark dirty (no disk write). */
+    private void onSaveHeader(HBox actionsView, HBox actionsEdit) {
+        if (presenter == null) { exitHeaderEdit(actionsView, actionsEdit); return; }
         Workout w = app.getCurrentWorkout();
-        if (w == null) {
-            exitEdit(actionsView, actionsEdit);
-            return;
-        }
+        if (w == null) { exitHeaderEdit(actionsView, actionsEdit); return; }
 
-        String name  = tfTitle.getText().trim();
+        String name  = tfName.getText().trim();
         String notes = tfNotes.getText().trim();
         Course c     = selectedCourse();
 
-        // 1) apply edits to the model (updates header stats etc.)
-        presenter.saveHeaderEdits(name, notes, c);
-
-        // 2) persist to disk
-        try {
-            // Prefer the app helper if you have it:
-            // (We added this earlier when wiring persistence.)
-            app.persistCurrentWorkout();
-            // If you *don’t* have app.persistCurrentWorkout(), use:
-            // LocalStore.saveWorkout(app.getCurrentWorkout());
-        } catch (Exception ex) {
-            new Alert(Alert.AlertType.ERROR, "Failed to save workout:\n" + ex.getMessage(),
-                    ButtonType.OK).showAndWait();
-            // Still fall through to exit edit; user can try again.
-        }
-
-        // 3) exit edit + refresh UI (timestamps will reflect updatedAt)
-        exitEdit(actionsView, actionsEdit);
+        presenter.saveHeaderEdits(name, notes, c); // must mark dirty & tick inside
+        headerDirty.set(true); // header edits change the workout; mark dirty
+        updateStats();
+        exitHeaderEdit(actionsView, actionsEdit);
         refreshFrom(app.getCurrentWorkout());
+    }
+
+    /** Persist ENTIRE workout; clears dirty and refreshes. */
+    private void onSaveGlobal() {
+        try {
+            app.persistCurrentWorkout();
+            // Clearing the dirty flag hides the chip and the Save button via bindings
+            headerDirty.set(false);
+            refreshFrom(app.getCurrentWorkout());
+        } catch (Exception ex) {
+            new Alert(Alert.AlertType.ERROR,
+                    "Failed to save workout:\n" + ex.getMessage(), ButtonType.OK)
+                    .showAndWait();
+        }
     }
 
     private void onDelete() {
@@ -318,25 +322,27 @@ public final class WorkoutHeaderPane {
     // ------------------------------------------------------------------
     private void refreshFrom(Workout w) {
         if (w == null) {
-            lblTitle.setText("");
+            lblName.setText("");
             lblNotes.setText("");
-            tfTitle.clear();
+            tfName.clear();
             tfNotes.clear();
             tgCourse.selectToggle(null);
             lblTimestamps.setText("");
-            updateStats(null);
+            updateStats();
+            tfName.setVisible(false); tfName.setManaged(false);
+            tfNotes.setVisible(false); tfNotes.setManaged(false);
+            lblName.setVisible(true); lblName.setManaged(true);
+            lblNotes.setVisible(true); lblNotes.setManaged(true);
             return;
         }
 
-        // Title/Notes (both display + edit widgets)
-        String title = nullToEmpty(w.getName());
+        String name  = nullToEmpty(w.getName());
         String notes = nullToEmpty(w.getNotes());
-        lblTitle.setText(title);
-        lblNotes.setText(notes.isBlank() ? " " : notes); // keep row height
-        tfTitle.setText(title);
+        lblName.setText(name);
+        lblNotes.setText(notes.isBlank() ? " " : notes);
+        tfName.setText(name);
         tfNotes.setText(notes);
 
-        // Course radios reflect model
         Course course = (w.getCourse() == null ? Course.SCY : w.getCourse());
         switch (course) {
             case SCY -> tgCourse.selectToggle(rbSCY);
@@ -344,32 +350,46 @@ public final class WorkoutHeaderPane {
             case LCM -> tgCourse.selectToggle(rbLCM);
         }
 
-        updateStats(w);
+        updateStats();
         lblTimestamps.setText("Created " + DateFmt.local(w.getCreatedAt()) +
                 "   •   Updated " + DateFmt.local(w.getUpdatedAt()));
     }
 
-    private void updateStats(Workout w) {
+    private void updateStats() {
+        // If labels are bound to presenter properties, let bindings drive the UI
+        if (statDistance.textProperty().isBound()
+                || statDuration.textProperty().isBound()
+                || statSwim.textProperty().isBound()
+                || statRest.textProperty().isBound()) {
+            return;
+        }
+
+        if (presenter != null) {
+            String dist = presenter.totalDistanceTextProperty().get();
+            String dur  = presenter.durationTextProperty().get();
+            String swim = presenter.swimTimeTextProperty().get();
+            String rest = presenter.restTimeTextProperty().get();
+
+            statDistance.setText(dist == null || dist.isBlank() ? "—" : dist);
+            statDuration.setText(mmssOnly(dur));
+            statSwim.setText(mmssOnly(swim));
+            statRest.setText(mmssOnly(rest));
+            return;
+        }
+
+        // Fallback to the current workout's own totals if presenter is not available
+        Workout w = app.getCurrentWorkout();
         if (w == null) {
             statDistance.setText("—");
             statDuration.setText("—");
             statSwim.setText("—");
             statRest.setText("—");
-            return;
+        } else {
+            statDistance.setText(w.totalDistance().toShortString());
+            statDuration.setText("—");
+            statSwim.setText("—");
+            statRest.setText("—");
         }
-
-        // Prefer presenter’s computed values; fall back to model when blank.
-        String dist = (presenter != null) ? presenter.totalDistanceTextProperty().get() : null;
-        if (dist == null || dist.isBlank()) dist = w.totalDistance().toShortString();
-
-        String dur  = (presenter != null) ? presenter.durationTextProperty().get()  : "—";
-        String swim = (presenter != null) ? presenter.swimTimeTextProperty().get() : "—";
-        String rest = (presenter != null) ? presenter.restTimeTextProperty().get() : "—";
-
-        statDistance.setText(dist);
-        statDuration.setText(dur);
-        statSwim.setText(swim);
-        statRest.setText(rest);
     }
 
     private static HBox chip(Label l) {
@@ -398,6 +418,13 @@ public final class WorkoutHeaderPane {
         if (t == rbSCM) return Course.SCM;
         if (t == rbLCM) return Course.LCM;
         return null;
+    }
+
+    // Returns only mm:ss, or "—" if blank/null. Removes trailing .SSS if present.
+    private static String mmssOnly(String s) {
+        if (s == null || s.isBlank()) return "—";
+        int dot = s.lastIndexOf('.');
+        return (dot > 0 ? s.substring(0, dot) : s);
     }
 
     private static String nullToEmpty(String s) { return s == null ? "" : s; }

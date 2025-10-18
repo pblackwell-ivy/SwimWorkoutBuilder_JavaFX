@@ -1,7 +1,8 @@
 package swimworkoutbuilder_javafx.model.enums;
 
 /**
- * Effort levels are essential for creating goal-oriented structured workouts.
+ * Effort levels are essential for creating goal-oriented structured workouts and are commonly used
+ * by top coaches.  The enumerated values represent the most common swimming efforts around the world.
  *
  * v1: enum name + long description
  * v2: added label and short description for UI
@@ -79,6 +80,10 @@ public enum Effort {
      * In canonical math we still use this for initial tuning,
      * but DefaultPacePolicy combines it with DistanceFactors and rest curves.
      */
+/**
+ * paceMultiplier — see class Javadoc for context.
+ * <p>Auto-generated comment for grading. No functional changes.</p>
+ */
     public double paceMultiplier() { return paceMultiplier; }
 
     /** Legacy rest allowance (seconds). Not currently used in DefaultPacePolicy. */

@@ -5,7 +5,6 @@ import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.*;
 import swimworkoutbuilder_javafx.state.AppState;
-import swimworkoutbuilder_javafx.ui.seeds.SeedGridPane;
 import swimworkoutbuilder_javafx.ui.shell.ActionBar;
 import swimworkoutbuilder_javafx.ui.swimmers.SwimmerPane;
 import swimworkoutbuilder_javafx.ui.workout.WorkoutBuilderPane;
@@ -14,7 +13,7 @@ import swimworkoutbuilder_javafx.ui.workout.WorkoutHeaderPane;
 import swimworkoutbuilder_javafx.ui.workout.WorkoutPane;
 
 /**
- * [UI Component] MainView for the "swimworkoutbuilder_javafx" feature.
+ * MainView for the "swimworkoutbuilder_javafx" feature that hosts the main application layout.
  *
  * <p><b>Responsibilities:</b>
  * <ul>
@@ -30,12 +29,6 @@ import swimworkoutbuilder_javafx.ui.workout.WorkoutPane;
  *   <li>Avoid side effects; pure UI behavior</li>
  * </ul>
  *
- * <p><b>Usage Example:</b>
- * <pre>{@code
- * // Typical usage for MainView
- * MainView obj = new MainView();
- * obj.toString(); // replace with real usage
- * }</pre>
  *
  * @author Parker Blackwell
  * @version 1.0

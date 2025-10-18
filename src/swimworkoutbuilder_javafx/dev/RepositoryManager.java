@@ -1,4 +1,4 @@
-package swimworkoutbuilder_javafx.model.repository;
+package swimworkoutbuilder_javafx.dev;
 
 import java.io.*;
 import java.nio.file.*;

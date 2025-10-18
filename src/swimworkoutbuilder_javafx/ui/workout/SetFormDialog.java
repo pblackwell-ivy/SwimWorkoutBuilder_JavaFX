@@ -21,34 +21,33 @@ import java.util.EnumSet;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.model.Workout;
 import swimworkoutbuilder_javafx.model.enums.Equipment;
-import swimworkoutbuilder_javafx.model.pacing.DefaultPacePolicy;
 import swimworkoutbuilder_javafx.model.pacing.PacePolicy;
+import swimworkoutbuilder_javafx.model.pacing.DefaultPacePolicy;
 
 import java.io.InputStream;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Modal dialog for creating or editing a single SwimSet.
- * Pure view: returns a SwimSet or empty if cancelled.
+ * Add/Edit Set dialog (MVP). Creates or edits a single {@link SwimSet}.
+ * - Shows live Goal/Interval suggestions (policy math stays elsewhere).
+ * - Lets the user toggle equipment (purely presentational icons here).
+ * - Returns the set on OK or empty on cancel.
  */
 public final class SetFormDialog {
 
-    // Pace policy used for goal/interval suggestions
-    private static final swimworkoutbuilder_javafx.model.pacing.PacePolicy POLICY =
-            new swimworkoutbuilder_javafx.model.pacing.DefaultPacePolicy();
+    private static final PacePolicy POLICY = new DefaultPacePolicy();
 
     private SetFormDialog() {}
 
-    /** Show the dialog (ownerless). Pass existing to edit, or null to add. */
+    /** Opens the modal dialog and blocks until the user confirms or cancels. */
     public static Optional<SwimSet> show(SwimSet existing) {
         Stage dialog = new Stage();
-
         dialog.initModality(Modality.APPLICATION_MODAL);
         dialog.setTitle(existing == null ? "Add Set" : "Edit Set");
 
         // ----------------------------
-        // Row 1: REPS × DISTANCE (centered, large)
+        // Row 1: REPS × DISTANCE
         // ----------------------------
         Spinner<Integer> spReps = new Spinner<>(1, 999, 1);
         spReps.setEditable(true);
@@ -57,10 +56,10 @@ public final class SetFormDialog {
         Label xLabel = new Label("×");
         xLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
 
-        // set increment to pool length set in workout header
         Course courseForDialog = resolveCourse();
         int lapLen = (courseForDialog == Course.LCM) ? 50 : 25; // if it's not LCM, it's 25
-        SpinnerValueFactory.IntegerSpinnerValueFactory distFactory = new SpinnerValueFactory.IntegerSpinnerValueFactory(25, 9999, 100, lapLen);
+        SpinnerValueFactory.IntegerSpinnerValueFactory distFactory =
+                new SpinnerValueFactory.IntegerSpinnerValueFactory(25, 9999, 100, lapLen);
 
         Spinner<Integer> spDist = new Spinner<>(distFactory);
         spDist.setEditable(true);
@@ -77,7 +76,6 @@ public final class SetFormDialog {
         repsLbl.getStyleClass().add("section-label");
         distLbl.getStyleClass().add("section-label");
 
-        // labels under each spinner, still centered as a unit
         HBox rdLabels = new HBox(60, repsLbl, distLbl);
         rdLabels.setAlignment(Pos.CENTER);
 
@@ -85,7 +83,7 @@ public final class SetFormDialog {
         row1.setAlignment(Pos.CENTER);
 
         // ----------------------------
-        // STROKE (4 + 3, indented)
+        // STROKE
         // ----------------------------
         ToggleGroup tgStroke = new ToggleGroup();
         RadioButton rbFree  = mkStroke(tgStroke, StrokeType.FREESTYLE);
@@ -109,7 +107,7 @@ public final class SetFormDialog {
         VBox strokeBox = new VBox(6, strokeLabel, strokeRow1, strokeRow2);
 
         // ----------------------------
-        // EFFORT LEVEL (slider)
+        // EFFORT
         // ----------------------------
         Label effortLabel = new Label("EFFORT LEVEL");
         effortLabel.getStyleClass().add("section-label");
@@ -125,7 +123,7 @@ public final class SetFormDialog {
         VBox effortBox = new VBox(6, effortLabel, effortSlider);
 
         // ----------------------------
-        // Interval & Goal (two rows, compact fields)
+        // Interval & Goal
         // ----------------------------
         TextField tfInterval = new TextField();
         tfInterval.setPromptText("e.g., 1:30");
@@ -146,10 +144,10 @@ public final class SetFormDialog {
         GridPane timeGrid = new GridPane();
         timeGrid.setHgap(12);
         timeGrid.setVgap(8);
-        ColumnConstraints c0 = new ColumnConstraints(); // interval label box
-        ColumnConstraints c1 = new ColumnConstraints(); // interval field
-        ColumnConstraints c2 = new ColumnConstraints(); // goal label
-        ColumnConstraints c3 = new ColumnConstraints(); // goal field
+        ColumnConstraints c0 = new ColumnConstraints();
+        ColumnConstraints c1 = new ColumnConstraints();
+        ColumnConstraints c2 = new ColumnConstraints();
+        ColumnConstraints c3 = new ColumnConstraints();
         c1.setHgrow(Priority.NEVER);
         c3.setHgrow(Priority.NEVER);
         timeGrid.getColumnConstraints().addAll(c0, c1, c2, c3);
@@ -159,9 +157,8 @@ public final class SetFormDialog {
         timeGrid.add(goalLbl, 2, 0);
         timeGrid.add(tfGoal, 3, 0);
 
-
         // ----------------------------
-        // EQUIPMENT (icons w/ tooltips; visual only)
+        // EQUIPMENT
         // ----------------------------
         Label equipLabel = new Label("EQUIPMENT");
         equipLabel.getStyleClass().add("section-label");
@@ -177,20 +174,17 @@ public final class SetFormDialog {
         FlowPane equipPane = new FlowPane(12, 10,
                 cbFins, cbKickboard, cbPullBuoy, cbPaddles, cbSnorkel, cbParachute, cbDragSocks);
         equipPane.setAlignment(Pos.CENTER_LEFT);
-        equipPane.setPrefWrapLength(480);
+        equipPane.setPrefWrapLength(640);
+        equipPane.setPadding(new Insets(0,0,0,24));
 
         VBox equipBox = new VBox(6, equipLabel, equipPane);
         equipBox.setAlignment(Pos.CENTER_LEFT);
-        equipPane.setPadding(new Insets(0,0,0,24));
-
         equipBox.setMinHeight(56);
         equipBox.setPrefHeight(56);
         equipBox.setMaxHeight(56);
 
-
-
         // ----------------------------
-        // NOTES (multi-line, half-ish width)
+        // NOTES
         // ----------------------------
         Label notesLabel = new Label("NOTES");
         notesLabel.getStyleClass().add("section-label");
@@ -201,7 +195,6 @@ public final class SetFormDialog {
         notesArea.setPrefHeight(80);
         notesArea.setMinHeight(80);
         notesArea.setMaxHeight(80);
-
         VBox notesBox = new VBox(6, notesLabel, notesArea);
 
         // ----------------------------
@@ -217,11 +210,25 @@ public final class SetFormDialog {
             effortSlider.setValue(indexOfEffort(existing.getEffort()));
             if (existing.getGoalTime() != null) tfGoal.setText(formatTime(existing.getGoalTime()));
             if (existing.getNotes() != null) notesArea.setText(existing.getNotes());
+
+            // ✅ Prefill equipment selections so they persist round-trip
+            java.util.Set<Equipment> eq = existing.getEquipment();
+            if (eq != null) {
+                cbFins.setSelected(eq.contains(Equipment.FINS));
+                cbKickboard.setSelected(eq.contains(Equipment.KICK_BOARD));
+                cbPullBuoy.setSelected(eq.contains(Equipment.PULL_BUOY));
+                cbPaddles.setSelected(eq.contains(Equipment.PADDLES));
+                cbSnorkel.setSelected(eq.contains(Equipment.SNORKEL));
+                cbParachute.setSelected(eq.contains(Equipment.PARACHUTE));
+                cbDragSocks.setSelected(eq.contains(Equipment.DRAG_SOCKS));
+            }
         } else {
-            // Defaults for new
             spReps.getValueFactory().setValue(1);
             spDist.getValueFactory().setValue(100);
             rbFree.setSelected(true);
+            if (tgStroke.getSelectedToggle() == null) {
+                rbFree.setSelected(true);
+            }
             effortSlider.setValue(indexOfEffort(Effort.EASY));
         }
 
@@ -241,7 +248,6 @@ public final class SetFormDialog {
         pane.setContent(content);
         pane.getButtonTypes().addAll(btnCancel, btnAdd);
 
-        // Style the actual Button nodes (fix dim appearance)
         Button okBtn = (Button) pane.lookupButton(btnAdd);
         okBtn.getStyleClass().setAll("button", "primary");
         okBtn.setDefaultButton(true);
@@ -252,19 +258,14 @@ public final class SetFormDialog {
         cancelBtn.setCancelButton(true);
         cancelBtn.setDisable(false);
 
-        pane.setMinHeight(Region.USE_PREF_SIZE);
-
-
-        // --- Policy + “suggested” interval/goal live recompute -------------------
-
+        // --- Live recompute (placeholder) ---
         final Workout workout = AppState.get().getCurrentWorkout();
         final Swimmer swimmer = AppState.get().getCurrentSwimmer();
 
-        // Build equipment set from the seven icon checkboxes
         java.util.function.Supplier<java.util.Set<Equipment>> eqSupplier = () -> {
-            EnumSet<Equipment> eq = EnumSet.noneOf(Equipment.class);
+            java.util.EnumSet<Equipment> eq = java.util.EnumSet.noneOf(Equipment.class);
             if (cbFins.isSelected())      eq.add(Equipment.FINS);
-            if (cbKickboard.isSelected()) eq.add(Equipment.PULL_BUOY);   // If you model Kick as PULL_BUOY keep; else change
+            if (cbKickboard.isSelected()) eq.add(Equipment.KICK_BOARD);
             if (cbPullBuoy.isSelected())  eq.add(Equipment.PULL_BUOY);
             if (cbPaddles.isSelected())   eq.add(Equipment.PADDLES);
             if (cbSnorkel.isSelected())   eq.add(Equipment.SNORKEL);
@@ -276,29 +277,32 @@ public final class SetFormDialog {
         Runnable recompute = () -> {
             try {
                 if (workout == null || swimmer == null) return;
+                Toggle sel = tgStroke.getSelectedToggle();
+                if (sel == null || sel.getUserData() == null) return;
 
                 int reps = spReps.getValue();
                 int distance = spDist.getValue();
-
-                StrokeType stroke = (StrokeType) tgStroke.getSelectedToggle().getUserData();
+                StrokeType stroke = (StrokeType) sel.getUserData();
                 Effort effort = Effort.values()[(int) Math.round(effortSlider.getValue())];
                 Course course = resolveCourse();
 
-                // Build a TEMP SwimSet that mirrors the form state (so policy sees the real inputs)
-                Distance distObj = (course == Course.SCY) ? Distance.ofYards(distance) : Distance.ofMeters(distance);
-                SwimSet temp = new SwimSet(stroke, Math.max(1, reps), distObj, effort, course, ""); // notes ignored for math
-                temp.setEquipment(eqSupplier.get()); // assumes SwimSet has setEquipment(Set<Equipment>)
+                Distance distObj = (course == Course.SCY)
+                        ? Distance.ofYards(distance)
+                        : Distance.ofMeters(distance);
 
-                // Use YOUR pacing policy
-                int goalSec     = (int) Math.round(POLICY.goalSeconds(workout, temp, swimmer, /*repIndex*/ 0));
-                int intervalSec = POLICY.intervalSeconds(workout, temp, swimmer, /*repIndex*/ 0);
+                SwimSet temp = new SwimSet(stroke, Math.max(1, reps), distObj, effort, course, "");
+                temp.setEquipment(eqSupplier.get());
 
-                tfGoal.setText(TimeSpan.ofSeconds(goalSec).toString());
-                tfInterval.setText(TimeSpan.ofSeconds(intervalSec).toString());
-            } catch (Throwable ignored) { }
+                int goalSec     = (int) Math.round(POLICY.goalSeconds(workout, temp, swimmer, 0));
+                int intervalSec = POLICY.intervalSeconds(workout, temp, swimmer, 0);
+
+                tfGoal.setText(formatSeconds(goalSec));
+                tfInterval.setText(formatSeconds(intervalSec));
+            } catch (Throwable t) {
+                System.err.println("SetForm recompute failed: " + t.getMessage());
+            }
         };
 
-        // Hook recompute to all inputs that affect pace
         spReps.valueProperty().addListener((o,a,b) -> recompute.run());
         spDist.valueProperty().addListener((o,a,b) -> recompute.run());
         tgStroke.selectedToggleProperty().addListener((o,a,b) -> recompute.run());
@@ -311,29 +315,18 @@ public final class SetFormDialog {
         cbParachute.selectedProperty().addListener((o,a,b) -> recompute.run());
         cbDragSocks.selectedProperty().addListener((o,a,b) -> recompute.run());
 
-        // Prime once after defaults/prefill are set
         recompute.run();
 
-        Scene scene = new Scene(pane);                      // no fixed W×H
+        Scene scene = new Scene(pane);
         Theme.apply(scene, SetFormDialog.class);
         dialog.setScene(scene);
-
-        // let content and dialog rely on preferred sizes
-        content.setMinWidth(Region.USE_PREF_SIZE);
-        content.setMinHeight(Region.USE_PREF_SIZE);
-        pane.setMinHeight(Region.USE_PREF_SIZE);
-
         dialog.setResizable(false);
-
-        // do the sizing *after* CSS/layout have run to avoid flicker
         dialog.sizeToScene();
         javafx.application.Platform.runLater(dialog::sizeToScene);
-
         dialog.centerOnScreen();
 
         final SwimSet[] result = new SwimSet[1];
 
-        // Handle OK
         ((Button) pane.lookupButton(btnAdd)).setOnAction(e -> {
             try {
                 int reps = spReps.getValue();
@@ -343,29 +336,17 @@ public final class SetFormDialog {
                 Effort effort = Effort.values()[(int) Math.round(effortSlider.getValue())];
 
                 Course course = resolveCourse();
-                Distance distObj = isMeters(course)
-                        ? Distance.ofMeters(distance)
-                        : Distance.ofYards(distance);
-
+                Distance distObj = isMeters(course) ? Distance.ofMeters(distance) : Distance.ofYards(distance);
                 String notes = notesArea.getText() == null ? "" : notesArea.getText().trim();
 
                 SwimSet s = new SwimSet(stroke, reps, distObj, effort, course, notes);
-
-                // Carry equipment selections into the saved set (if your SwimSet supports it)
                 s.setEquipment(eqSupplier.get());
 
-                // Parse any user-entered goal first
                 String goalTxt = tfGoal.getText();
                 TimeSpan goal = parseFlexible(goalTxt);
                 if (goal != null) {
                     s.setGoalTime(goal);
-                } else if (workout != null && swimmer != null) {
-                    // Otherwise, fill from policy suggestion so rows/header stay consistent
-                    int goalSec = (int) Math.round(POLICY.goalSeconds(workout, s, swimmer, 0));
-                    s.setGoalTime(TimeSpan.ofSeconds(goalSec));
                 }
-
-                // (Interval is not wired in model per current code base; keep UI only.)
                 result[0] = s;
                 dialog.close();
             } catch (Exception ex) {
@@ -382,21 +363,13 @@ public final class SetFormDialog {
         return Optional.ofNullable(result[0]);
     }
 
-    // ----------------------------
-    // Helpers
-    // ----------------------------
-
-    private static boolean isMeters(Course c) {
-        return c == Course.SCM || c == Course.LCM;
-    }
+    private static boolean isMeters(Course c) { return c == Course.SCM || c == Course.LCM; }
 
     private static Course resolveCourse() {
         try {
             var w = AppState.get().getCurrentWorkout();
             return (w != null && w.getCourse() != null) ? w.getCourse() : Course.SCY;
-        } catch (Throwable t) {
-            return Course.SCY;
-        }
+        } catch (Throwable t) { return Course.SCY; }
     }
 
     private static RadioButton mkStroke(ToggleGroup g, StrokeType st) {
@@ -409,19 +382,23 @@ public final class SetFormDialog {
     private static void selectStrokeRadio(ToggleGroup g, StrokeType st) {
         if (st == null) return;
         for (Toggle t : g.getToggles()) {
-            if (Objects.equals(t.getUserData(), st)) {
+            if (java.util.Objects.equals(t.getUserData(), st)) {
                 g.selectToggle(t);
                 return;
             }
         }
     }
 
-    /** Image checkbox with tooltip (visual only). */
     private static CheckBox iconCheck(String fileName, int size, String tooltip) {
-        ImageView iv = new ImageView(loadImage("/resources/images/" + fileName));
-        iv.setFitWidth(40);
-        iv.setFitHeight(40);
+        String path = "/images/" + fileName;
+        Image img = loadImage(path);
+
+        ImageView iv = new ImageView();
+        if (img != null) iv.setImage(img);
+        iv.setFitWidth(size);
+        iv.setFitHeight(size);
         iv.setPreserveRatio(true);
+
         CheckBox cb = new CheckBox();
         cb.setGraphic(iv);
         cb.setTooltip(new Tooltip(tooltip));
@@ -431,21 +408,23 @@ public final class SetFormDialog {
 
     private static Image loadImage(String path) {
         try (InputStream is = SetFormDialog.class.getResourceAsStream(path)) {
-            if (is != null) return new Image(is);
-        } catch (Exception ignored) { }
-        return new Image( // tiny fallback 1×1
-                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/UmQK9kAAAAASUVORK5CYII=");
+            if (is != null) {
+                return new Image(is);
+            } else {
+                System.err.println("⚠️ Missing image: " + path);
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to load image: " + path + " (" + e.getMessage() + ")");
+        }
+        return null;
     }
 
-    // "m:ss", "m:ss.hh", "ss", "ss.hh"
     private static TimeSpan parseFlexible(String s) {
         if (s == null) return null;
         s = s.trim();
         if (s.isEmpty()) return null;
-
         int minutes = 0, seconds, hundredths = 0;
         String work = s;
-
         if (work.contains(":")) {
             String[] parts = work.split(":");
             if (!parts[0].isBlank()) minutes = safeInt(parts[0], 0);
@@ -474,9 +453,12 @@ public final class SetFormDialog {
         return String.format("%d:%02d", m, s);
     }
 
-    /**
-     * Map Effort enum to a 0-based index used by the slider ticks.
-     */
+    private static String formatSeconds(int sec) {
+        int m = Math.max(0, sec) / 60;
+        int s = Math.max(0, sec) % 60;
+        return String.format("%d:%02d", m, s);
+    }
+
     private static int indexOfEffort(Effort e) {
         if (e == null) return 0;
         Effort[] vals = Effort.values();
@@ -486,7 +468,6 @@ public final class SetFormDialog {
         return 0;
     }
 
-    /** Show Effort names along the slider ticks. */
     private static final class StringConverterEffort extends javafx.util.StringConverter<Double> {
         @Override public String toString(Double value) {
             int idx = (int)Math.round(value == null ? 0 : value);

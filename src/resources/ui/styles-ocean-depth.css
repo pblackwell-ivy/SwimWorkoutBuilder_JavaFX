@@ -1,6 +1,5 @@
 /* =========================================
    SwimWorkoutBuilder – Theme: Ocean Depth
-   (Option B: wrapper sheet columns)
    ========================================= */
 
 /* ----------------------------
@@ -76,6 +75,13 @@
   -fx-border-radius: 8px;
   -fx-padding: 12px;
 }
+
+.workout-title { -fx-font-weight: 700; }
+.workout-notes { -fx-font-style: italic; -fx-padding: 2 0 0 8; }
+/* Ensure italic notes in builder rows (covers Label and its .text child) */
+.label.set-notes { -fx-font-style: italic; }
+.set-notes > .text { -fx-font-style: italic; }
+.set-notes { -fx-font-style: italic; }
 
 /* ----------------------------
    2a) FORMS (base)

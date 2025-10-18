@@ -45,7 +45,7 @@ public final class ActionBar {
     // ---------------------------------------------------------------------
     private final ComboBox<Swimmer> cbSwimmer = new ComboBox<>();
     private final Button btnNewSwimmer  = new Button("New Swimmer");
-    private final Button btnManageSwimmer = new Button("Manage…"); // opens combo popup for now
+    private final Button btnManageSwimmer = new Button("Manage Swimmers"); // opens combo popup for now
 
     // ---------------------------------------------------------------------
     // Workout controls
@@ -98,12 +98,12 @@ public final class ActionBar {
         // --- Role styles (theme classes) ---------------------------------
         setRoles(btnNewSwimmer,  "secondary");
         setRoles(btnManageSwimmer, "secondary");
-        setRoles(btnNewWorkout,  "primary");
+        setRoles(btnNewWorkout,  "secondary");
         setRoles(btnOpenWorkout, "secondary");
         setRoles(btnPrint,       "ghost");
 
         setRoles(btnSaveWorkout, "primary", "sm", "icon");
-        btnSaveWorkout.setGraphic(Icons.make("save", 16));
+        btnSaveWorkout.setGraphic(Icons.make("save-white", 16));
         btnSaveWorkout.setTooltip(new Tooltip("Save workout"));
         btnSaveWorkout.disableProperty().bind(AppState.get().getWorkoutBuilderPresenter().dirtyProperty().not());
 
@@ -123,11 +123,44 @@ public final class ActionBar {
 
         // Items + two-way selection
         cbSwimmer.setItems(app.getSwimmers());
+
+        // Keep combo items in sync if AppState swaps its swimmers list instance
+        app.swimmersProperty().addListener((obs, oldList, newList) -> {
+            cbSwimmer.setItems(newList != null ? newList : javafx.collections.FXCollections.observableArrayList());
+            // Reconcile selection by logical id (not by instance)
+            Swimmer cur = app.getCurrentSwimmer();
+            if (cur != null) {
+                Swimmer match = findById(cbSwimmer.getItems(), cur);
+                if (match != null) {
+                    cbSwimmer.getSelectionModel().select(match);
+                } else if (!cbSwimmer.getItems().isEmpty()) {
+                    cbSwimmer.getSelectionModel().selectFirst();
+                    app.setCurrentSwimmer(cbSwimmer.getValue());
+                } else {
+                    cbSwimmer.getSelectionModel().clearSelection();
+                }
+            } else {
+                // No current swimmer: keep selection empty or pick first if available
+                if (!cbSwimmer.getItems().isEmpty()) {
+                    cbSwimmer.getSelectionModel().selectFirst();
+                    app.setCurrentSwimmer(cbSwimmer.getValue());
+                } else {
+                    cbSwimmer.getSelectionModel().clearSelection();
+                }
+            }
+        });
+
         cbSwimmer.getSelectionModel().selectedItemProperty().addListener((o, oldV, sel) -> {
-            if (sel != null && sel != app.getCurrentSwimmer()) app.setCurrentSwimmer(sel);
+            if (sel != null && !sameSwimmer(sel, app.getCurrentSwimmer())) {
+                app.setCurrentSwimmer(sel);
+            }
         });
         app.currentSwimmerProperty().addListener((o, oldV, s) -> {
-            if (s != cbSwimmer.getValue()) cbSwimmer.setValue(s);
+            if (!sameSwimmer(s, cbSwimmer.getValue())) {
+                // Try to select by id; fall back to direct value
+                Swimmer match = findById(cbSwimmer.getItems(), s);
+                cbSwimmer.getSelectionModel().select(match != null ? match : s);
+            }
         });
 
         // Enable/disable workout actions based on swimmer presence
@@ -287,5 +320,21 @@ public final class ActionBar {
         } else {
             return false;
         }
+    }
+    // ---------------------------------------------------------------------
+    // Swimmer identity helpers
+    // ---------------------------------------------------------------------
+    private static boolean sameSwimmer(Swimmer a, Swimmer b) {
+        if (a == b) return true;
+        if (a == null || b == null) return false;
+        return java.util.Objects.equals(a.getId(), b.getId());
+    }
+
+    private static Swimmer findById(java.util.List<Swimmer> list, Swimmer target) {
+        if (target == null || list == null) return null;
+        for (Swimmer s : list) {
+            if (sameSwimmer(s, target)) return s;
+        }
+        return null;
     }
 }

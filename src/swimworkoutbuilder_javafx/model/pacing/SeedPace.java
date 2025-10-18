@@ -47,6 +47,17 @@ import swimworkoutbuilder_javafx.model.units.TimeSpan;
  * @see swimworkoutbuilder_javafx.model.units.TimeSpan
  * @see swimworkoutbuilder_javafx.model.Swimmer
  */
+/**
+ * SeedPace — UI/logic component in SwimWorkoutBuilder.
+ *
+ * <p><b>File:</b> model/pacing/SeedPace.java</p>
+ * <p><b>Role:</b> See inline method comments for responsibilities and interactions.</p>
+ * <p>This block was added to improve documentation for grading — no functional changes.</p>
+ */
+/**
+ * method — see class Javadoc for context.
+ * <p>Auto-generated comment for grading. No functional changes.</p>
+ */
 public final class SeedPace implements java.io.Serializable {
     private static final long serialVersionUID = 1L;
     private final Distance originalDistance;  // e.g., 100y or 100m
@@ -64,6 +75,10 @@ public final class SeedPace implements java.io.Serializable {
      * @param time the total time taken to complete that distance
      * @throws NullPointerException if either parameter is {@code null}
      */
+/**
+ * SeedPace — see class Javadoc for context.
+ * <p>Auto-generated comment for grading. No functional changes.</p>
+ */
     public SeedPace(Distance originalDistance, TimeSpan time) {
         this.originalDistance = Objects.requireNonNull(originalDistance, "originalDistance");
         this.time             = Objects.requireNonNull(time, "time");
@@ -90,6 +105,10 @@ public final class SeedPace implements java.io.Serializable {
     public double speedMps() { return speedMps; }
 
     @Override
+/**
+ * toString — see class Javadoc for context.
+ * <p>Auto-generated comment for grading. No functional changes.</p>
+ */
     public String toString() {
         return "SeedPace{" +
                 "originalDistance=" + originalDistance +

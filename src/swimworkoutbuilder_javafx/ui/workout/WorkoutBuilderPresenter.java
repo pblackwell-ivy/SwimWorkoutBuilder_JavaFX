@@ -347,10 +347,12 @@ public class WorkoutBuilderPresenter {
     }
 
     /**
-     * Marks the workout as dirty and refreshes the UI.
+     * Marks the workout as dirty, recomputes header stats, and refreshes the UI.
      */
     private void markDirty() {
         dirty.set(true);
+        // Recompute header totals immediately so the UI reflects the change
+        computeStats();
         bumpRefresh();
     }
 

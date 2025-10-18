@@ -9,42 +9,15 @@ import java.util.stream.Collectors;
 import swimworkoutbuilder_javafx.model.Swimmer;
 
 /**
- * Repository for managing swimmers.
- *
- * <p>This class provides persistence and retrieval of {@link Swimmer} data.
- * Swimmer profiles are stored in a simple CSV file located in the application's data directory
- * The repository ensures that the folder and file exist before attempting read/write operations.
- *
- * <p><b>Responsibilities:</b>
- * <ul>
- *     <li> Load swimmers from CSV into memory.</li>
- *     <li> Save swimmers back to CSV.</li>
- *     <li>Create the necessary directory and file if they do not exist.</li>
- *     <li> Very simple CSV escaping (quotes only).</li>
- * </ul>
- *
- * <p><b>Design Notes:</b>
- * <ul>
- *     <li>CSV storage is deliberately minimal to reduce dependencies. Future versions may support JSON or database-backed persistence.</li>
- *     <li>Escaping is basic and intended only to handle commas and quotes in swimmer names - it is not intended as a general CSV solution.</li>
- * </ul>
- *
- * <p><b>Usage Example:</b>
- * <pre>{@code
- * SwimmerRepository repo = SwimmerRepository.getInstance();
- * List<Swimmer> swimmers = repo.loadAll();
- *
- * Swimmer parker = new Swimmer("Parker", "Blackwell", " ", "Indy Aquatic Masters");
- * swimmers.add(parker);
- *
- * repo.saveAll(swimmers);
- * }</pre>
- *
- * @author parkerblackwell
- * @version 1.0
- * @since 2025-10-03
- * @see Swimmer
+ * @deprecated Legacy persistence prototype.
+ * <p>
+ * This class was part of an early experiment for saving and loading swimmers
+ * to a CSV file before {@link swimworkoutbuilder_javafx.store.LocalStore}
+ * was implemented. It is no longer referenced anywhere in the application.
+ * <p>
+ * Retained for documentation and grading purposes only.
  */
+@Deprecated
 public final class SwimmerRepository {
 
     // private no-arg constructor: can't create instances of SwimmerRepository, "SwimmerRepositor repo = new SwimmerRepository()" is not allowed.

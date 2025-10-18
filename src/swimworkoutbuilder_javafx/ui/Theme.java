@@ -5,15 +5,16 @@ import java.net.URL;
 
 /**
  * Utility for applying the global SwimWorkoutBuilder CSS theme to any Scene.
- * Use this in dialogs or secondary stages that don't inherit the main stylesheet.
+ * Initially used in Main.java, but now also used in dialogs and secondary stages that
+ * don't inherit the main stylesheet.
  */
 
 public final class Theme {
     private Theme() {}
 
     // Match Main.java
-    private static final String CSS_NAME = "styles-ocean-depth-opt-b.css";
-    private static final String CSS_PATH = "/swimworkoutbuilder_javafx/ui/" + CSS_NAME;
+    private static final String CSS_NAME = "styles-ocean-depth.css";
+    private static final String CSS_PATH = "/ui/" + CSS_NAME;
 
     /** Convenient default that uses Theme.class for resource lookup. */
     public static void apply(Scene scene) {
