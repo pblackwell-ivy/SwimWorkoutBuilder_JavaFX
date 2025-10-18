@@ -1,26 +1,26 @@
 package swimworkoutbuilder_javafx.ui.workout;
 
+
+import java.util.EnumSet;
+import java.util.Objects;
 import javafx.beans.property.*;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
-import swimworkoutbuilder_javafx.state.AppState;
-import swimworkoutbuilder_javafx.model.enums.Course;
-import swimworkoutbuilder_javafx.model.units.Distance;
-import swimworkoutbuilder_javafx.ui.workout.SetFormPresenter;
-import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.model.SwimSet;
 import swimworkoutbuilder_javafx.model.Swimmer;
 import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.model.enums.Course;
 import swimworkoutbuilder_javafx.model.enums.Course;
 import swimworkoutbuilder_javafx.model.enums.Effort;
 import swimworkoutbuilder_javafx.model.enums.Equipment;
 import swimworkoutbuilder_javafx.model.enums.StrokeType;
 import swimworkoutbuilder_javafx.model.pacing.PacePolicy;
 import swimworkoutbuilder_javafx.model.units.Distance;
+import swimworkoutbuilder_javafx.model.units.Distance;
 import swimworkoutbuilder_javafx.model.units.TimeSpan;
-
-import java.util.EnumSet;
-import java.util.Objects;
+import swimworkoutbuilder_javafx.state.AppState;
+import swimworkoutbuilder_javafx.state.AppState;
+import swimworkoutbuilder_javafx.ui.workout.SetFormPresenter;
 
 /**
  * Presenter for the "Edit Set" dialog: holds user inputs and exposes

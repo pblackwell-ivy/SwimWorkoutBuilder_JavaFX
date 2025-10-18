@@ -1,259 +1,423 @@
 package swimworkoutbuilder_javafx.ui.seeds;
 
+import java.util.EnumMap;
+import java.util.Map;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.*;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.scene.text.Font;
-
 import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.Workout;
+import swimworkoutbuilder_javafx.model.enums.Course;
 import swimworkoutbuilder_javafx.model.enums.StrokeType;
 import swimworkoutbuilder_javafx.model.pacing.SeedPace;
 import swimworkoutbuilder_javafx.model.units.Distance;
 import swimworkoutbuilder_javafx.model.units.TimeSpan;
 import swimworkoutbuilder_javafx.state.AppState;
 import swimworkoutbuilder_javafx.store.LocalStore;
+import swimworkoutbuilder_javafx.ui.Icons;
 
-import java.util.EnumMap;
-import java.util.Map;
+/**
+ * SeedGridPane — compact card showing/editing 100-distance seed times by stroke.
+ * View mode shows an edit icon; edit mode shows cancel/save icons.
+ * Buttons: ✎ (edit), ↩ (cancel), 💾 (save)
+ */
+public final class SeedGridPane extends BorderPane {
 
-public class SeedGridPane extends VBox {
+    // Displayed unit only (model stays canonical = per 100m)
+    private enum Unit { YD, M }
+
+    private static final double YARD_TO_METER = 0.9144;
+    private static final double METER_TO_YARD = 1.0 / 0.9144;
+
+    private static final int DEFAULT_DISPLAY_SECONDS = 120; // 2:00 default
+
+    private final GridPane seedGrid = new GridPane();
+    private final Label title = new Label("Seed Times");
+    private final Label hintLabel = new Label("Tip: enter times as seconds or mm:ss.hh. Leave blank to clear.");
+
+    // Header action buttons (need to be fields because wireState() binds to them)
+    private Button btnEdit;
+    private Button btnSave;
+    private Button btnCancel;
 
     private final ToggleGroup unitGroup = new ToggleGroup();
-    private final RadioButton rbYards = new RadioButton("100 yards");
-    private final RadioButton rbMeters = new RadioButton("100 meters");
+    private final RadioButton rbYd = new RadioButton("yd");
+    private final RadioButton rbM  = new RadioButton("m");
+    private final ObjectProperty<Unit> displayUnit = new SimpleObjectProperty<>(Unit.YD);
 
-    private final Map<StrokeType, TextField> timeFields = new EnumMap<>(StrokeType.class);
+    private final Map<StrokeType, TextField> fields = new EnumMap<>(StrokeType.class);
 
-    private final Label titleLabel = new Label("Seed Times");
+    private final SeedTimesPresenter presenter = new SeedTimesPresenter(AppState.get());
+    private final BooleanProperty hasSwimmer = new SimpleBooleanProperty(false);
 
-    private final Button btnEdit = new Button("Edit");
-    private final Button btnCancel = new Button("Cancel");
-    private final Button btnSave = new Button("Save & Exit");
-
-    private Swimmer swimmer;
-    private Runnable onSeedsSaved = () -> {};
+    private Swimmer boundSwimmer;
+    private Runnable onSeedsSaved;
 
     public SeedGridPane() {
-        setAlignment(Pos.TOP_CENTER);
-        setSpacing(10);
-        setPadding(new Insets(10));
+        getStyleClass().addAll("card", "compact");
 
-        titleLabel.getStyleClass().add("label-header");
-
-        HBox radios = new HBox(20, rbYards, rbMeters);
-        radios.setAlignment(Pos.CENTER);
-        rbYards.setToggleGroup(unitGroup);
-        rbMeters.setToggleGroup(unitGroup);
-        rbYards.setSelected(true);
-
-        GridPane grid = buildGrid();
-
-        HBox buttons = new HBox(15, btnEdit, btnCancel, btnSave);
-        buttons.setAlignment(Pos.CENTER);
-
-        btnEdit.getStyleClass().add("button-secondary");
-        btnCancel.getStyleClass().add("button-secondary");
-        btnSave.getStyleClass().add("button-primary");
-
-        // initial mode = view (not editing)
-        setEditing(false);
-
-        btnEdit.setOnAction(e -> setEditing(true));
-        btnCancel.setOnAction(e -> {
-            if (swimmer != null) loadFromSwimmer(swimmer);
-            setEditing(false);
-        });
-
-        btnSave.setOnAction(e -> {
-            if (applyToModel()) {
-                // persist + nudge listeners
-                Swimmer cur = AppState.get().getCurrentSwimmer();
-                if (cur != null) {
-                    try { LocalStore.saveSwimmer(cur); } catch (Exception ignored) {}
-                    AppState.get().setCurrentSwimmer(cur);
-                }
-                setEditing(false);
-                if (swimmer != null) loadFromSwimmer(swimmer);
-                onSeedsSaved.run();
-            }
-        });
-
-        getChildren().addAll(titleLabel, radios, grid, buttons);
-
-        // keep in sync if current swimmer changes elsewhere
-        AppState.get().currentSwimmerProperty().addListener((obs, o, s) -> {
-            bindSwimmer(s);
-        });
+        buildUI();
+        initUnitsFromWorkout();
+        wireState();
+        var app = AppState.get();
+        bindSwimmer(app.getCurrentSwimmer()); // initial
+        app.currentSwimmerProperty().addListener((obs, oldS, newS) -> bindSwimmer(newS));
+        setEditable(false);
     }
 
     public void bindSwimmer(Swimmer s) {
-        this.swimmer = s;
-        loadFromSwimmer(s);
-        setEditing(false);
+        boundSwimmer = s;
+        hasSwimmer.set(s != null);
+        loadFromSwimmer();
     }
 
-    public void setOnSeedsSaved(Runnable r) {
-        this.onSeedsSaved = (r == null ? () -> {} : r);
-    }
+    public void setOnSeedsSaved(Runnable r) { this.onSeedsSaved = r; }
 
-    private GridPane buildGrid() {
-        GridPane grid = new GridPane();
-        grid.getStyleClass().add("grid-pane");
-        grid.setHgap(10);
-        grid.setVgap(5);
-        grid.setPadding(new Insets(10));
+    private void buildUI() {
+        setPadding(new Insets(6));
 
-        ColumnConstraints c0 = new ColumnConstraints();
-        c0.setHalignment(HPos.RIGHT);
-        c0.setMinWidth(80);
-        ColumnConstraints c1 = new ColumnConstraints();
-        c1.setPrefWidth(110);
+        // — Title + actions in a single header row
+        title.getStyleClass().add("card-title");
+        hintLabel.getStyleClass().add("muted");
+        hintLabel.setWrapText(true);
+        hintLabel.setVisible(false);
+        hintLabel.setManaged(false);
+        hintLabel.setMaxWidth(Double.MAX_VALUE);
+        hintLabel.maxWidthProperty().bind(seedGrid.widthProperty());
+        hintLabel.setPadding(new Insets(4, 0, 0, 0)); // small spacing above
+        VBox.setVgrow(hintLabel, Priority.NEVER);
+
+        btnEdit = new Button();
+        btnEdit.getStyleClass().setAll("button","secondary","sm","icon");
+        btnEdit.setGraphic(Icons.make("pencil-swim-text", 16));
+        btnEdit.setTooltip(new Tooltip("Edit seed times"));
+
+        btnSave = new Button();
+        btnSave.getStyleClass().setAll("button","secondary","sm","icon");
+        btnSave.setGraphic(Icons.make("save-swim-text", 16));
+        btnSave.setTooltip(new Tooltip("Save seed times"));
+
+        btnCancel = new Button();
+        btnCancel.getStyleClass().setAll("button","secondary","sm","icon");
+        btnCancel.setGraphic(Icons.make("circle-x-swim-text", 16));
+        btnCancel.setTooltip(new Tooltip("Cancel edits"));
+
+        // ensure small consistent square hit targets
+        for (Button b : new Button[]{btnEdit, btnCancel, btnSave}) {
+            b.setMinWidth(32); b.setPrefWidth(32);
+        }
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox header = new HBox(8, title, spacer, btnEdit, btnCancel, btnSave);
+        header.getStyleClass().add("card-header");
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        // — Units toggle directly under header
+        rbYd.setToggleGroup(unitGroup);
+        rbM.setToggleGroup(unitGroup);
+        rbYd.setFocusTraversable(false);
+        rbM.setFocusTraversable(false);
+        HBox unitBox = new HBox(4, new Label("Units:"), rbYd, rbM);
+        unitBox.setAlignment(Pos.CENTER_LEFT);
+
+        // — Grid
+        seedGrid.getStyleClass().addAll("form-grid", "header-gap"); // header-gap = smaller top gap
+        // column headers
+        Label colStroke = new Label("Stroke");
+        Label colTime   = new Label();
+        colStroke.getStyleClass().setAll("table-column-header");
+        colTime.getStyleClass().setAll("table-column-header");
+        colTime.textProperty().bind(Bindings.createStringBinding(
+                () -> "100 " + (displayUnit.get() == Unit.YD ? "yd" : "m") + " seed", displayUnit));
+
+        seedGrid.add(colStroke, 0, 0);
+        seedGrid.add(colTime,   1, 0);
+        GridPane.setHalignment(colStroke, HPos.LEFT);
+        GridPane.setHalignment(colTime,   HPos.CENTER);
+
+        int row = 1;
+        for (StrokeType st : StrokeType.values()) addRow(row++, st);
+
+        ColumnConstraints c0 = new ColumnConstraints(); // labels
+        ColumnConstraints c1 = new ColumnConstraints(); // inputs
+        c0.setHgrow(Priority.NEVER);
         c1.setHgrow(Priority.NEVER);
-        grid.getColumnConstraints().addAll(c0, c1);
+        c1.setHalignment(HPos.CENTER);
+        seedGrid.getColumnConstraints().setAll(c0, c1);
+        seedGrid.setAlignment(Pos.TOP_CENTER);
 
-        Label hStroke = new Label("Stroke");
-        hStroke.getStyleClass().add("label-column-header");
-        Label hTime = new Label("Seed Time");
-        hTime.getStyleClass().add("label-column-header");
-        GridPane.setMargin(hStroke, new Insets(2,2,2,10));
-        GridPane.setMargin(hTime, new Insets(2,2,2,10));
-        grid.add(hStroke, 0, 0);
-        grid.add(hTime,   1, 0);
+        // — Stack content vertically (no bottom button row needed anymore)
+        VBox content = new VBox(6, header, unitBox, seedGrid, hintLabel);
+        content.setFillWidth(false);
+        content.setAlignment(Pos.TOP_CENTER);
+        setCenter(content);
 
-        StrokeType[] rows = {
-                StrokeType.FREESTYLE,
-                StrokeType.BUTTERFLY,
-                StrokeType.BACKSTROKE,
-                StrokeType.BREASTSTROKE,
-                StrokeType.INDIVIDUAL_MEDLEY,
-                StrokeType.DRILL,
-                StrokeType.KICK
-        };
-
-        for (int i = 0; i < rows.length; i++) {
-            int row = i + 1;
-            StrokeType stroke = rows[i];
-
-            Label lbl = new Label(pretty(stroke));
-            lbl.setFont(Font.font(14));
-            TextField tf = new TextField();
-            tf.setPromptText("m:ss.hh");
-            tf.setTextFormatter(timeFormatter());
-
-            GridPane.setMargin(lbl, new Insets(2,2,2,10));
-            grid.add(lbl, 0, row);
-            grid.add(tf,  1, row);
-
-            timeFields.put(stroke, tf);
-        }
-        return grid;
+        // initial visual (bindings take over later)
+        btnSave.setDisable(true);
+        btnCancel.setDisable(true);
     }
 
-    private void setEditing(boolean editing) {
-        rbYards.setDisable(!editing);
-        rbMeters.setDisable(!editing);
-        timeFields.values().forEach(tf -> tf.setEditable(editing));
-
-        btnEdit.setDisable(editing);
-        btnCancel.setDisable(!editing);
-        btnSave.setDisable(!editing);
+    // --- helper ---
+    private static void setRoles(Button b, String... roles) {
+        // keep "button" + role; remove previous role(s)
+        b.getStyleClass().removeAll("primary","secondary","ghost","success","danger","sm","icon");
+        b.getStyleClass().add("button");
+        b.getStyleClass().addAll(roles);
     }
 
-    private void loadFromSwimmer(Swimmer s) {
-        if (s == null) {
-            timeFields.values().forEach(tf -> tf.setText(""));
-            return;
-        }
-        boolean useYards = true;
-        for (var e : s.getSeedPaces().entrySet()) {
-            double m = e.getValue().getOriginalDistance().toMeters();
-            if (m >= 99.5 && m <= 100.5) { useYards = false; break; }
-        }
-        rbYards.setSelected(useYards);
-        rbMeters.setSelected(!useYards);
+    private void addRow(int row, StrokeType stroke) {
+        var lbl = new Label(stroke.getLabel());
+        lbl.getStyleClass().add("table-row-label");
 
-        // clear first
-        timeFields.values().forEach(tf -> tf.setText(""));
-        s.getSeedPaces().forEach((stroke, pace) -> {
-            timeFields.get(stroke).setText(fmtTime(pace.getTime()));
+        var tf = new TextField();
+        tf.setPromptText("m:ss.hh");
+        tf.getStyleClass().add("seed-time-input");
+        tf.setPrefColumnCount(6);
+        tf.setMaxWidth(54);
+        tf.textProperty().addListener((o, a, b) -> {
+            if (presenter.editingProperty().get()) presenter.markDirty();
+        });
+
+        fields.put(stroke, tf);
+
+        seedGrid.add(lbl, 0, row);
+        seedGrid.add(tf, 1, row);
+        GridPane.setHalignment(lbl, HPos.LEFT);
+    }
+
+    /**
+     * Initialize display unit from current workout; on unit/workout change we
+     * re-render fields from canonical seeds instead of converting text in place.
+     */
+    private void initUnitsFromWorkout() {
+        Workout w = AppState.get().getCurrentWorkout();
+        Course c = (w != null ? w.getCourse() : Course.SCY);
+        boolean yards = (c == Course.SCY);
+        (yards ? rbYd : rbM).setSelected(true);
+        displayUnit.set(yards ? Unit.YD : Unit.M);
+
+        // Unit toggle: just change the flag and reload from swimmer
+        unitGroup.selectedToggleProperty().addListener((obs, oldT, newT) -> {
+            Unit newUnit = (newT == rbYd) ? Unit.YD : Unit.M;
+            if (displayUnit.get() != newUnit) {
+                displayUnit.set(newUnit);
+                loadFromSwimmer();
+            }
+        });
+
+        // Workout course changed externally (SCY/SCM/LCM) → update display unit and reload
+        AppState.get().currentWorkoutProperty().addListener((o, oldW, newW) -> {
+            if (newW != null && !rbYd.isFocused() && !rbM.isFocused()) {
+                boolean yd = (newW.getCourse() == Course.SCY);
+                Unit newU = yd ? Unit.YD : Unit.M;
+                if (displayUnit.get() != newU) {
+                    (yd ? rbYd : rbM).setSelected(true);
+                    displayUnit.set(newU);
+                    loadFromSwimmer();
+                }
+            }
         });
     }
 
-    /** Read UI → write into bound swimmer. Returns true if success. */
-    private boolean applyToModel() {
-        if (swimmer == null) return false;
-        Map<StrokeType, SeedPace> paces = readPacesFromFields();
-        swimmer.clearAllSeeds();
-        paces.forEach(swimmer::updateSeedTime);
-        return true;
-    }
-
-    private Map<StrokeType, SeedPace> readPacesFromFields() {
-        Map<StrokeType, SeedPace> out = new EnumMap<>(StrokeType.class);
-        boolean yards = rbYards.isSelected();
-        Distance d = yards ? Distance.ofYards(100) : Distance.ofMeters(100);
-
-        for (var e : timeFields.entrySet()) {
-            String txt = e.getValue().getText().trim();
-            if (txt.isEmpty()) continue;
-            TimeSpan t = parseTime(txt);
-            out.put(e.getKey(), new SeedPace(d, t));
-        }
-        return out;
-    }
-
-    // --- helpers ---
-
-    private static String pretty(StrokeType st) {
-        return switch (st) {
-            case FREESTYLE -> "Freestyle";
-            case BUTTERFLY -> "Butterfly";
-            case BACKSTROKE -> "Backstroke";
-            case BREASTSTROKE -> "Breaststroke";
-            case INDIVIDUAL_MEDLEY -> "Individual Medley";
-            case DRILL -> "Drill";
-            case KICK -> "Kick";
-        };
-    }
-
-    private static TextFormatter<String> timeFormatter() {
-        return new TextFormatter<>(change -> {
-            String s = change.getControlNewText();
-            if (!s.matches("[0-9:.]*")) return null;
-            if (s.length() > 7) return null; // m:ss.hh
-            return change;
+    private void wireState() {
+        presenter.editingProperty().addListener((obs, wasEditing, isEditing) -> {
+            if (isEditing) {
+                setRoles(btnEdit, "ghost", "sm", "icon");     // fades while editing
+                setRoles(btnSave, "primary", "sm", "icon");   // main action
+                setRoles(btnCancel, "secondary", "sm", "icon");
+                hintLabel.setVisible(true);
+                hintLabel.setManaged(true);
+            } else {
+                setRoles(btnEdit, "secondary", "sm", "icon"); // single action visible
+                setRoles(btnSave, "ghost", "sm", "icon");
+                setRoles(btnCancel, "ghost", "sm", "icon");
+                hintLabel.setVisible(false);
+                hintLabel.setManaged(false);
+            }
         });
+
+        btnEdit.setOnAction(e -> {
+            if (!hasSwimmer.get()) return;
+            presenter.beginEdit();
+            setEditable(true);
+        });
+
+        btnCancel.setOnAction(e -> {
+            presenter.cancel();
+            loadFromSwimmer();
+            setEditable(false);
+        });
+
+        btnSave.setOnAction(e -> {
+            if (!hasSwimmer.get()) return;
+            if (!saveIntoSwimmer(boundSwimmer)) return;
+            try { LocalStore.saveSwimmer(boundSwimmer); } catch (Exception ignored) {}
+            presenter.save();
+            setEditable(false);
+            if (onSeedsSaved != null) onSeedsSaved.run();
+        });
+
+        // Enable/disable by state
+        btnEdit.disableProperty().bind(
+                hasSwimmer.not().or(presenter.editingProperty())  // disable Edit while editing or no swimmer
+        );
+
+        btnSave.disableProperty().bind(
+                presenter.editingProperty().not()
+                        .or(presenter.canSaveProperty().not())    // Save only when editing AND canSave
+        );
+
+        btnCancel.disableProperty().bind(
+                presenter.editingProperty().not()                 // Cancel only when editing
+        );
+
+        // Visibility to match card: Edit in view; Cancel/Save in edit
+        btnEdit.visibleProperty().bind(presenter.editingProperty().not());
+        btnEdit.managedProperty().bind(btnEdit.visibleProperty());
+        btnSave.visibleProperty().bind(presenter.editingProperty());
+        btnSave.managedProperty().bind(btnSave.visibleProperty());
+        btnCancel.visibleProperty().bind(presenter.editingProperty());
+        btnCancel.managedProperty().bind(btnCancel.visibleProperty());
     }
 
-    private static String fmtTime(TimeSpan t) {
-        long ms = t.toMillis();
-        long minutes = ms / 60000;
-        long seconds = (ms % 60000) / 1000;
-        long hundredths = ((ms % 1000) + 5) / 10;
-        if (hundredths == 100) { hundredths = 0; seconds++; }
-        if (seconds == 60) { seconds = 0; minutes++; }
-        return String.format("%d:%02d.%02d", minutes, seconds, hundredths);
+    private void setEditable(boolean editable) {
+        fields.values().forEach(tf -> tf.setEditable(editable));
     }
+
+    private void loadFromSwimmer() {
+        for (var e : fields.entrySet()) {
+            StrokeType st = e.getKey();
+            TimeSpan canonical100m = readCanonical100m(boundSwimmer, st); // from model (m canonical)
+            String txt;
+            if (canonical100m != null) {
+                double canonSec = canonical100m.toMillis() / 1000.0;
+                double dispSec = convertCanonicalToDisplaySeconds(canonSec, displayUnit.get());
+                txt = formatTimeSeconds(dispSec);
+            } else {
+                // No value in the model → show 2:00 by default (in CURRENT display units)
+                txt = formatTimeSeconds(DEFAULT_DISPLAY_SECONDS);
+            }
+            e.getValue().setText(txt);
+        }
+        presenter.cancel();
+        presenter.save();
+        presenter.editingProperty().set(false);
+    }
+
+    // ===== Conversions =====
+
+    private static double convertDisplayToCanonicalSeconds(double sec, Unit disp) {
+        // Display → canonical (per 100m). Yards should be larger when converted to meters.
+        return (disp == Unit.YD) ? sec * METER_TO_YARD : sec;
+    }
+
+    private static double convertCanonicalToDisplaySeconds(double sec, Unit disp) {
+        // Canonical (100m) → display. Yards should be smaller (× 0.9144).
+        return (disp == Unit.YD) ? sec * YARD_TO_METER : sec;
+    }
+
+    // (Kept for possible future use, but no longer called during toggles)
+    @SuppressWarnings("unused")
+    private void convertAllFields(Unit from, Unit to) {
+        if (from == to) return;
+        for (var e : fields.entrySet()) {
+            String cur = e.getValue().getText();
+            if (cur == null || cur.isBlank()) continue;
+            TimeSpan t = parseTime(cur);
+            if (t == null) continue;
+            double seconds = t.toMillis() / 1000.0;
+            double canonSec = convertDisplayToCanonicalSeconds(seconds, from);
+            double newDisplaySec = convertCanonicalToDisplaySeconds(canonSec, to);
+            e.getValue().setText(formatTimeSeconds(newDisplaySec));
+        }
+    }
+
+    // ===== Model I/O specialized for SeedPace =====
+
+    /** Derive canonical 100m time from existing SeedPace by using speed (m/s). */
+    private static TimeSpan readCanonical100m(Swimmer s, StrokeType st) {
+        if (s == null) return null;
+        try {
+            Map<StrokeType, SeedPace> map = s.getSeedPaces();
+            if (map == null) return null;
+            SeedPace sp = map.get(st);
+            if (sp == null) return null;
+            double v = sp.speedMps();
+            if (v <= 0) return null;
+            double sec100m = 100.0 / v;
+            return TimeSpan.ofMillis(Math.round(sec100m * 1000.0));
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** Save as SeedPace(100m, canonicalTime) using Swimmer#setAllSeedPaces. */
+    private boolean saveIntoSwimmer(Swimmer s) {
+        try {
+            EnumMap<StrokeType, SeedPace> next = new EnumMap<>(StrokeType.class);
+            for (var e : fields.entrySet()) {
+                StrokeType st = e.getKey();
+                String text = e.getValue().getText();
+                TimeSpan parsed = parseTime(text);
+                if (parsed == null) continue; // blank = clear
+
+                double dispSec   = parsed.toMillis() / 1000.0;
+                double canonSec  = convertDisplayToCanonicalSeconds(dispSec, displayUnit.get());
+                TimeSpan canonTs = TimeSpan.ofMillis(Math.round(canonSec * 1000.0));
+                next.put(st, new SeedPace(Distance.ofMeters(100), canonTs));
+            }
+            s.setAllSeedPaces(next);
+            return true;
+        } catch (Throwable t) {
+            new Alert(Alert.AlertType.ERROR,
+                    "Unable to save seeds — unexpected swimmer API.")
+                    .showAndWait();
+            return false;
+        }
+    }
+
+    // ===== Time helpers =====
 
     private static TimeSpan parseTime(String s) {
+        if (s == null) return null;
         s = s.trim();
-        int minutes = 0; int seconds; int hundredths = 0;
-        if (s.contains(":")) {
-            String[] parts = s.split(":");
-            minutes = Integer.parseInt(parts[0]);
-            s = parts[1];
+        if (s.isEmpty()) return null;
+
+        int minutes = 0, seconds;
+        int hundredths = 0;
+
+        String work = s;
+        if (work.contains(":")) {
+            String[] parts = work.split(":");
+            if (!parts[0].isBlank()) minutes = parseIntSafe(parts[0], 0);
+            work = (parts.length >= 2) ? parts[1] : "";
         }
-        if (s.contains(".")) {
-            String[] parts = s.split("\\.");
-            seconds = Integer.parseInt(parts[0]);
-            String h = parts[1];
-            if (h.length()==1) h = h + "0";
-            hundredths = Integer.parseInt(h.substring(0,2));
+        if (work.contains(".")) {
+            String[] p2 = work.split("\\.");
+            seconds = parseIntSafe(p2[0], 0);
+            String h = (p2.length >= 2) ? p2[1] : "0";
+            if (h.length() == 1) h = h + "0";
+            hundredths = parseIntSafe(h.substring(0, Math.min(2, h.length())), 0);
         } else {
-            seconds = Integer.parseInt(s);
+            seconds = parseIntSafe(work, 0);
         }
+
         return TimeSpan.ofMinutesSecondsMillis(minutes, seconds, hundredths * 10);
+    }
+
+    private static String formatTimeSeconds(double seconds) {
+        long total = Math.max(0, Math.round(seconds));
+        long m = total / 60;
+        long s2 = total % 60;
+        return String.format("%d:%02d", m, s2);
+    }
+
+    private static int parseIntSafe(String v, int def) {
+        try { return Integer.parseInt(v.trim()); } catch (Exception e) { return def; }
     }
 }

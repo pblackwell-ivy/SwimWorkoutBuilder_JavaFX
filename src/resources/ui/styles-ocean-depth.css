@@ -1,0 +1,498 @@
+/* =========================================
+   SwimWorkoutBuilder – Theme: Ocean Depth
+   ========================================= */
+
+/* ----------------------------
+   0) DESIGN TOKENS / ROOT
+   ---------------------------- */
+.root {
+  -fx-font-family: "Inter", "Segoe UI", "Roboto", "Arial", sans-serif;
+
+  -swim-bg:           #F5F7FA;
+  -swim-surface:      #FFFFFF;
+  -swim-text:         #0F172A;
+  -swim-text-weak:    #64748B;
+
+  -swim-primary:      #0077B6;
+  -swim-primary-600:  #005A8D;
+  -swim-primary-700:  #004E7A;
+
+  -swim-secondary:    #4682B4;
+  -swim-accent:       #00A2C7;
+
+  -swim-success:      #16A34A;
+  -swim-warning:      #F59E0B;
+  -swim-danger:       #D92D20;
+
+  -swim-border:       #E3E8EF;
+
+  -fx-background-color: -swim-bg;
+  -fx-focus-color: #66B3FF;
+  -fx-faint-focus-color: rgba(102,179,255,0.22);
+}
+
+/* ----------------------------
+   1) TYPOGRAPHY
+   ---------------------------- */
+.label, .text { -fx-text-fill: -swim-text; -fx-font-size: 14px; }
+.muted { -fx-text-fill: -swim-text-weak; }
+.help  { -fx-text-fill: -swim-text-weak; -fx-font-size: 12px; }
+
+/* ----------------------------
+   2) SURFACES & CARDS
+   ---------------------------- */
+/* Card-like panels: white bg, subtle border, rounded corners */
+.surface, .card {
+  -fx-background-color: -swim-surface;
+  -fx-background-radius: 8px;
+  -fx-border-color: -swim-border;
+  -fx-border-width: 1px;
+  -fx-border-radius: 8px;
+  -fx-padding: 12px;
+}
+.card-header {
+  -fx-alignment: center-left;
+  -fx-spacing: 8;
+  -fx-padding: 0 0 8 0;
+  -fx-border-color: rgba(15,23,42,0.06);
+  -fx-border-width: 0 0 1px 0;
+}
+.card-title {
+  -fx-font-size: 16px;
+  -fx-font-weight: 700;
+  -fx-text-fill: -swim-text;
+}
+
+/* Legacy helper if any GridPane is visually used as a surface */
+.grid-pane {
+  -fx-grid-lines-visible: false;
+  -fx-hgap: 10px;
+  -fx-vgap: 6px;
+  -fx-background-color: -swim-surface;
+  -fx-background-radius: 8px;
+  -fx-border-color: -swim-border;
+  -fx-border-width: 1px;
+  -fx-border-radius: 8px;
+  -fx-padding: 12px;
+}
+
+.workout-title { -fx-font-weight: 700; }
+.workout-notes { -fx-font-style: italic; -fx-padding: 2 0 0 8; }
+/* Ensure italic notes in builder rows (covers Label and its .text child) */
+.label.set-notes { -fx-font-style: italic; }
+.set-notes > .text { -fx-font-style: italic; }
+.set-notes { -fx-font-style: italic; }
+
+/* ----------------------------
+   2a) FORMS (base)
+   ---------------------------- */
+.form-grid {
+  -fx-hgap: 8;
+  -fx-vgap: 8;
+  -fx-padding: 6; /* gentle inner gutter for base density */
+}
+.form-grid .label {
+  -fx-font-size: 12px;
+  -fx-font-weight: 600;
+  -fx-text-fill: -swim-text-weak;
+  -fx-opacity: .95;
+}
+
+.table-row-label {
+  -fx-font-size: 13px;
+  -fx-font-weight: 600;
+  -fx-text-fill: -swim-text;
+ }
+ /* add a bit of space under the header row */
+.form-grid.header-gap {-fx-vgap: 6;}
+/* ----------------------------
+   2b) COMPACT VARIANT (tight cards like SeedGridPane)
+   ---------------------------- */
+.card.compact { -fx-padding: 8; }  /* tighter than default 12 */
+
+.card.compact .section-title {
+  -fx-font-size: 16px;
+  -fx-padding: 4 0 4 0;
+}
+
+.card.compact .label-column-header {
+  -fx-font-size: 11px;
+  -fx-opacity: .9;
+}
+
+/* compact grids inside compact cards */
+.card.compact .form-grid,
+.card.compact .grid-pane {
+  -fx-hgap: 8;
+  -fx-vgap: 4;
+  -fx-padding: 2;
+}
+
+/* compact input sizing */
+.card.compact .text-field,
+.card.compact .password-field,
+.card.compact .choice-box,
+.card.compact .combo-box {
+  -fx-font-size: 12px;
+  -fx-padding: 2 6;
+  -fx-min-height: 24px;
+  -fx-pref-height: 24px;
+}
+
+/* compact labels general */
+.card.compact .label { -fx-font-size: 12px; }
+
+/* compact button row */
+.card.compact .button.sm { -fx-min-height: 22px; }
+.card.compact .buttons-row { -fx-padding: 4 0 0 0; }
+
+/* table/grid column header labels (e.g. Stroke, 100 yd seed) */
+.table-column-header,
+.table-col-header {
+  -fx-font-size: 13px;
+  -fx-font-weight: 700;
+  -fx-text-fill: -swim-text-weak;
+  -fx-opacity: .95;
+}
+
+/* make sure header styles win inside compact cards too */
+.card.compact .table-column-header,
+.card.compact .table-col-header {
+  -fx-font-size: 13px;
+  -fx-font-weight: 700;
+  -fx-text-fill: -swim-text-weak;
+  -fx-opacity: .95;
+}
+
+/* ----------------------------
+   2c) COLUMN WRAPPER (Option B)
+   ---------------------------- */
+/* Use on the StackPane that wraps a ScrollPane */
+.column-sheet {
+  -fx-background-color: -swim-surface;  /* white */
+  -fx-background-radius: 12;
+  -fx-border-width: 0;                  /* no outline per design */
+  -fx-padding: 10;                      /* inner gutter; tune 8–12 */
+  /* Optional subtle lift:
+  -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.03), 10, 0.2, 0, 1);
+  */
+}
+
+/* ScrollPane inside the sheet is transparent so the sheet shows through */
+.column-transparent { -fx-background-color: transparent; -fx-padding: 0; }
+.column-transparent > .viewport { -fx-background-color: transparent; }
+.column-transparent .corner { -fx-background-color: transparent; }
+
+/* Slim, modern scrollbars */
+.column-sheet .scroll-bar:vertical   { -fx-pref-width: 10; }
+.column-sheet .scroll-bar:horizontal { -fx-pref-height: 10; }
+
+/* Hide arrow buttons */
+.column-sheet .scroll-bar .increment-button,
+.column-sheet .scroll-bar .decrement-button {
+  -fx-padding: 0;
+  -fx-shape: "";
+  -fx-background-color: transparent;
+}
+
+/* Track = invisible */
+.column-sheet .scroll-bar .track {
+  -fx-background-color: transparent;
+  -fx-background-insets: 0;
+}
+
+/* Thumb styling */
+.column-sheet .scroll-bar .thumb {
+  -fx-background-color: rgba(15,23,42,0.25);
+  -fx-background-insets: 0;
+  -fx-background-radius: 8;
+}
+.column-sheet .scroll-bar .thumb:hover   { -fx-background-color: rgba(15,23,42,0.35); }
+.column-sheet .scroll-bar .thumb:pressed { -fx-background-color: rgba(15,23,42,0.45); }
+
+/* ----------------------------
+   2d) COLUMN CONTENT (stack of cards)
+   ---------------------------- */
+/* VBox inside the ScrollPane */
+.column-content {
+  -fx-spacing: 12;            /* vertical space between cards */
+  -fx-padding: 0 6 0 6;       /* small L/R inset so card borders don’t hug the sheet edge */
+}
+
+/* ----------------------------
+   3) HEADINGS
+   ---------------------------- */
+.label-header        { -fx-font-size: 22px; -fx-font-weight: 700; -fx-padding: 0 0 8px 0; }
+.section-title       { -fx-font-size: 18px; -fx-font-weight: 600; -fx-padding: 12px 0 6px 0; }
+
+/* table/grid column header labels (e.g. Stroke, 100 yd seed) */
+.table-column-header,
+.table-col-header {
+  -fx-font-size: 13px;
+  -fx-font-weight: 600;
+  -fx-text-fill: -swim-text-weak;
+  -fx-opacity: .95;
+}
+
+/* ----------------------------
+   4) INPUTS (base styling)
+   ---------------------------- */
+.text-field, .password-field {
+  -fx-background-color: -swim-surface;
+  -fx-text-fill: -swim-text;
+  -fx-prompt-text-fill: rgba(15,23,42,0.42);
+  -fx-border-color: -swim-border;
+  -fx-border-width: 1px;
+  -fx-background-insets: 0;
+  -fx-background-radius: 8px;
+  -fx-border-radius: 8px;
+  -fx-padding: 6px 8px;
+  -fx-min-height: 28px;
+  -fx-pref-height: 28px;
+}
+.text-field:focused, .password-field:focused {
+  -fx-border-color: -swim-primary;
+  -fx-effect: dropshadow(gaussian, rgba(0,119,182,0.18), 8, 0.2, 0, 0);
+}
+
+/* seed time tf alignment */
+.seed-time-input { -fx-alignment: CENTER; }
+
+/* ----------------------------
+   5) BUTTONS
+   ---------------------------- */
+.button {
+  -fx-background-radius: 8px;
+  -fx-text-fill: white;
+  -fx-font-weight: 600;
+  -fx-padding: 8px 12px;
+  -fx-background-insets: 0;
+  -fx-cursor: hand;
+}
+
+/* primary */
+.button.primary { -fx-background-color: -swim-primary; }
+.button.primary:hover  { -fx-background-color: -swim-primary-600; }
+.button.primary:armed  { -fx-background-color: -swim-primary-700; }
+.button.primary:disabled { -fx-opacity: .5; }
+
+/* secondary (outline) */
+.button.secondary {
+  -fx-background-color: transparent;
+  -fx-text-fill: -swim-secondary;
+  -fx-border-color: -swim-secondary;
+  -fx-border-width: 1px;
+  -fx-border-radius: 8px;
+}
+.button.secondary:hover { -fx-background-color: #EAF3FF; }
+
+/* ghost (quiet) */
+.button.ghost {
+  -fx-background-color: transparent;
+  -fx-text-fill: -swim-text-weak;
+}
+.button.ghost:hover { -fx-background-color: rgba(0,0,0,0.05); -fx-text-fill: -swim-text; }
+
+/* icon-only */
+.button.icon {
+  -fx-background-color: transparent;
+  -fx-padding: 2px;
+  -fx-alignment: CENTER;
+  -fx-content-display: GRAPHIC_ONLY;
+  -fx-min-width: 26px; -fx-min-height: 26px;
+  -fx-max-width: 26px; -fx-max-height: 26px;
+  -fx-text-fill: -swim-text-weak;
+}
+.button.icon:hover { -fx-background-color: rgba(0,119,182,0.06); -fx-text-fill: -swim-text; }
+.button.icon:disabled { -fx-opacity: .5; }
+
+/* intents */
+.button.accent  { -fx-background-color: -swim-accent; }
+.button.accent:hover { -fx-background-color: derive(-swim-accent, -10%); }
+.button.success { -fx-background-color: -swim-success; }
+.button.success:hover { -fx-background-color: derive(-swim-success, -10%); }
+.button.warn    { -fx-background-color: -swim-warning; }
+.button.warn:hover { -fx-background-color: derive(-swim-warning, -10%); }
+
+/* danger (outlined) */
+.button.danger {
+  -fx-background-color: transparent;
+  -fx-text-fill: #B24C4C;
+  -fx-border-color: #E0A0A0;
+  -fx-border-width: 1px;
+  -fx-background-radius: 8px;
+  -fx-border-radius: 8px;
+}
+.button.danger:hover { -fx-background-color: #F8E5E5; }
+
+/* compact button utility */
+.button.sm {
+  -fx-padding: 2px 8px;
+  -fx-min-height: 24px;
+  -fx-background-radius: 8px;
+  -fx-border-radius: 8px;
+  -fx-font-size: 12px;
+}
+
+/* ----------------------------
+   6) LISTS & ROWS
+   ---------------------------- */
+.list-view .list-cell { -fx-padding: 8 10; }
+.wb-set-row { -fx-padding: 4px 0; }
+.row:hover { -fx-background-color: rgba(0,119,182,0.06); }
+.separator:horizontal .line { -fx-background-color: #EDF2F7; }
+
+/* ----------------------------
+   7) SET LABELS (workout builder)
+   ---------------------------- */
+.label-setgroup-name { -fx-font-size: 15px; -fx-font-weight: 700; }
+.label-setgroup-rep  { -fx-font-size: 12px; -fx-text-fill: -swim-text-weak; }
+.label-setgroup-note { -fx-font-size: 12px; -fx-text-fill: -swim-text-weak; -fx-font-style: italic; }
+
+.label-set-primary   { -fx-font-size: 14px; -fx-font-weight: 600; }
+.label-set-note      { -fx-font-size: 12px; -fx-text-fill: -swim-text-weak; -fx-font-style: italic; }
+
+.label-set-stroke    { -fx-font-size: 13px; -fx-font-weight: 600; }
+.label-set-reps      { -fx-font-size: 13px; }
+.label-set-interval  { -fx-font-size: 13px; -fx-text-fill: -swim-text-weak; }
+.label-set-goal      { -fx-font-size: 13px; -fx-text-fill: -swim-text-weak; }
+
+/* ----------------------------
+   8) CHIP
+   ---------------------------- */
+.chip {
+  -fx-background-color: #EAF3FF;
+  -fx-text-fill: -swim-primary;
+  -fx-background-radius: 999;
+  -fx-padding: 2px 8px;
+  -fx-font-size: 12px;
+  -fx-font-weight: 600;
+  -fx-border-color: rgba(0,119,182,0.18);
+  -fx-border-radius: 999;
+}
+
+/* =======================================
+   9) TOOLBAR REFINEMENTS – ActionBar polish
+======================================= */
+.toolbar {
+ -fx-background-color: -swim-surface;
+ -fx-border-color: -swim-border;
+ -fx-border-width: 0 0 1px 0;
+ -fx-padding: 6 10;
+ -fx-spacing: 8;
+ -fx-alignment: CENTER_LEFT;
+}
+
+/* Ensure consistent height between combo and buttons */
+.toolbar .combo-box,
+.toolbar .choice-box {
+ -fx-min-height: 32px;
+ -fx-pref-height: 32px;
+ -fx-background-radius: 8;
+ -fx-border-radius: 8;
+ -fx-font-size: 13px;
+}
+
+/* Match inner padding & text positioning */
+.toolbar .combo-box > .list-cell,
+.toolbar .combo-box > .text-field,
+.toolbar .choice-box > .label {
+ -fx-padding: 4 10;
+ -fx-alignment: CENTER_LEFT;
+ -fx-text-fill: -swim-text;
+}
+
+/* Align arrow button height with button height */
+.toolbar .combo-box > .arrow-button,
+.toolbar .choice-box > .open-button {
+ -fx-padding: 0 10 0 6;
+ -fx-background-color: transparent;
+}
+
+/* Match hover/focus effects of buttons */
+.toolbar .combo-box:focused,
+.toolbar .choice-box:focused {
+ -fx-border-color: -swim-primary;
+ -fx-effect: dropshadow(gaussian, rgba(0,119,182,0.15), 6, 0.3, 0, 0);
+}
+.toolbar .combo-box:hover,
+.toolbar .choice-box:hover {
+ -fx-border-color: #BCD0E6;
+}
+
+/* Buttons in toolbar (normalize height + font size) */
+.toolbar .button {
+ -fx-min-height: 32px;
+ -fx-pref-height: 32px;
+ -fx-font-size: 13px;
+ -fx-font-weight: 600;
+ -fx-background-radius: 8;
+ -fx-border-radius: 8;
+}
+
+/* ----------------------------
+   10) SELECTS (ComboBox / ChoiceBox)
+   ---------------------------- */
+.combo-box, .choice-box {
+  -fx-background-color: -swim-surface;
+  -fx-text-fill: -swim-text;
+  -fx-border-color: #D7DEE7;
+  -fx-border-width: 1px;
+  -fx-background-radius: 8px;
+  -fx-border-radius: 8px;
+}
+.combo-box > .list-cell,
+.combo-box > .text-field,
+.choice-box > .label {
+  -fx-padding: 4 10;
+  -fx-text-fill: -swim-text;
+}
+.combo-box > .arrow-button,
+.choice-box > .open-button {
+  -fx-background-color: transparent;
+  -fx-padding: 0 8 0 6;
+}
+.combo-box > .arrow-button > .arrow,
+.choice-box > .open-button > .arrow {
+  -fx-background-color: -swim-secondary;
+}
+
+/* focus/hover */
+.combo-box:focused, .choice-box:focused {
+  -fx-border-color: -swim-primary;
+  -fx-effect: dropshadow(gaussian, rgba(0,119,182,0.15), 8, 0.2, 0, 0);
+}
+.combo-box:hover, .choice-box:hover { -fx-border-color: #BCD0E6; }
+
+/* popup list */
+.combo-box-popup > .list-view {
+  -fx-background-color: white;
+  -fx-background-insets: 0;
+  -fx-background-radius: 8px;
+  -fx-padding: 4;
+  -fx-border-color: #E6EAF0;
+  -fx-border-radius: 8px;
+}
+.combo-box-popup > .list-view .list-cell { -fx-padding: 6 10; }
+.combo-box-popup > .list-view .list-cell:filled:selected,
+.combo-box-popup > .list-view .list-cell:filled:hover {
+  -fx-background-color: #E6F2FF;
+  -fx-text-fill: -swim-text;
+}
+/* Add-Set dialog */
+.set-dialog .section-label,
+.set-dialog .section-label .text {
+  -fx-font-weight: 700;
+  -fx-font-size: 13px;
+}
+.set-dialog .section-sub   { -fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: -swim-text-weak; }
+
+.equipment-icon {
+  -fx-opacity: 0.9;
+}
+
+.equipment-icon:hover {
+  -fx-opacity: 1.0;
+  -fx-scale-x: 1.06;
+  -fx-scale-y: 1.06;
+}

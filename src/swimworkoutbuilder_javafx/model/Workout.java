@@ -1,12 +1,13 @@
 package swimworkoutbuilder_javafx.model;
 
-import swimworkoutbuilder_javafx.model.enums.Course;
-import swimworkoutbuilder_javafx.model.units.Distance;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import swimworkoutbuilder_javafx.model.enums.Course;
+import swimworkoutbuilder_javafx.model.units.Distance;
 
 /**
  * Represents a structured swim workout for a specific swimmer.
@@ -60,9 +61,11 @@ public class Workout implements java.io.Serializable {
     private String name;                      // e.g., "Tuesday Threshold"
     private Course course;                    // SCY, SCM, or LCM
     private String notes;                     // Optional workout-level notes (theme, focus)
+    private final Instant createdAt;          // When workout was created
+    private Instant updatedAt;                // When workout last updated
 
     // Defaults (used by printer between groups)
-    private int defaultRestBetweenGroupsSeconds = 0;
+    private int defaultRestBetweenGroupsSeconds = 60;
 
     // Contents
     private final List<SetGroup> groups = new ArrayList<>();
@@ -83,6 +86,8 @@ public class Workout implements java.io.Serializable {
         this.swimmerId = Objects.requireNonNull(swimmerId, "swimmerId");
         this.name = Objects.requireNonNull(name, "name");
         this.course = Objects.requireNonNull(course, "course");
+        this.createdAt = Instant.now();
+        this.updatedAt = this.createdAt;
     }
 
     /**
@@ -101,6 +106,36 @@ public class Workout implements java.io.Serializable {
         this.course = Objects.requireNonNull(course, "course");
         this.notes = notes;
         this.defaultRestBetweenGroupsSeconds = Math.max(0, defaultRestBetweenGroupsSeconds);
+        this.createdAt = Instant.now();
+        this.updatedAt = this.createdAt;
+    }
+
+    // Repository/loader (exact values from storage)
+    public Workout(UUID id, UUID swimmerId, String name, Course course, String notes,
+                   int defaultRestBetweenGroupsSeconds, java.time.Instant createdAt, java.time.Instant updatedAt) {
+        this.id = Objects.requireNonNull(id, "id");
+        this.swimmerId = Objects.requireNonNull(swimmerId, "swimmerId");
+        this.name = Objects.requireNonNull(name, "name");
+        this.course = Objects.requireNonNull(course, "course");
+        this.notes = notes;
+        this.defaultRestBetweenGroupsSeconds = Math.max(0, defaultRestBetweenGroupsSeconds);
+        this.createdAt = Objects.requireNonNull(createdAt, "createdAt");
+        this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt");
+    }
+
+    // Deep copy (same logical workout id; copies groups)
+    public Workout(Workout other) {
+        this.id = Objects.requireNonNull(other, "other").id;
+        this.swimmerId = other.swimmerId;
+        this.name = other.name;
+        this.course = other.course;
+        this.notes = other.notes;
+        this.defaultRestBetweenGroupsSeconds = other.defaultRestBetweenGroupsSeconds;
+        this.createdAt = other.createdAt;
+        this.updatedAt = other.updatedAt;
+        for (SetGroup g : other.getGroups()) {
+            if (g != null) this.getGroups().add(g.deepCopy());
+        }
     }
 
     // ----------------------------------------------------------
@@ -111,21 +146,42 @@ public class Workout implements java.io.Serializable {
     public UUID getId() { return id; }
 
     public UUID getSwimmerId() { return swimmerId; }
-    public void setSwimmerId(UUID swimmerId) { this.swimmerId = Objects.requireNonNull(swimmerId, "swimmerId"); }
+    public void setSwimmerId(UUID swimmerId) {
+        this.swimmerId = Objects.requireNonNull(swimmerId, "swimmerId");
+        touchUpdated();
+    }
 
     public String getName() { return name; }
-    public void setName(String name) { this.name = Objects.requireNonNull(name, "name"); }
+    public void setName(String name) {
+        this.name = Objects.requireNonNull(name, "name");
+        touchUpdated();
+    }
 
     public Course getCourse() { return course; }
-    public void setCourse(Course course) { this.course = Objects.requireNonNull(course, "course"); }
+    public void setCourse(Course course) {
+        this.course = Objects.requireNonNull(course, "course");
+        touchUpdated();
+    }
 
     public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
+    public void setNotes(String notes) {
+        this.notes = notes;
+        touchUpdated();
+    }
 
     public int getDefaultRestBetweenGroupsSeconds() { return defaultRestBetweenGroupsSeconds; }
     public void setDefaultRestBetweenGroupsSeconds(int seconds) {
         this.defaultRestBetweenGroupsSeconds = Math.max(0, seconds);
+        touchUpdated();
     }
+
+    // Timestamps
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt");
+    }
+    public void touchUpdated() { this.updatedAt = Instant.now(); }
 
     // ----------------------------------------------------------
     // Group management (ordered & mutable)
@@ -167,6 +223,79 @@ public class Workout implements java.io.Serializable {
         SetGroup b = groups.get(j);
         groups.set(i, b);
         groups.set(j, a);
+    }
+
+
+    // ----------------------------------------------------------
+// Workout copy helpers
+// ----------------------------------------------------------
+
+    /**
+     * Deep copy of this Workout, preserving the same ID and timestamps.
+     * All groups are deep-copied so the clone is fully independent.
+     *
+     * <p>Intended for in-memory duplication (e.g., undo/redo buffers,
+     * MVVM staging models). For a "Save As New" flow that should receive a
+     * new ID and fresh timestamps, use {@link #duplicateWithNewId(Workout)}.</p>
+     */
+    public Workout deepCopy() {
+        return new Workout(this); // uses the deep copy constructor you defined above
+    }
+
+    /**
+     * Copies mutable fields and deep-copies groups from {@code other} into this instance.
+     * <ul>
+     *   <li>Keeps this workout’s ID and createdAt as-is.</li>
+     *   <li>Copies swimmerId, name, course, notes, default rest.</li>
+     *   <li>Replaces groups with deep copies from {@code other}.</li>
+     *   <li>Updates this.updatedAt to now.</li>
+     * </ul>
+     */
+    public void copyFrom(Workout other) {
+        Objects.requireNonNull(other, "other");
+
+        // Metadata (do NOT change this.id or this.createdAt here)
+        this.swimmerId = Objects.requireNonNull(other.swimmerId, "swimmerId");
+        this.name = Objects.requireNonNull(other.name, "name");
+        this.course = Objects.requireNonNull(other.course, "course");
+        this.notes = other.notes;
+        this.defaultRestBetweenGroupsSeconds = Math.max(0, other.defaultRestBetweenGroupsSeconds);
+
+        // Replace groups with deep copies
+        this.groups.clear();
+        for (SetGroup g : other.groups) {
+            if (g != null) this.groups.add(g.deepCopy());
+        }
+
+        // Touch updated timestamp
+        this.updatedAt = java.time.Instant.now();
+    }
+
+    /**
+     * Factory that duplicates a workout as a brand-new entity
+     * (new ID, fresh timestamps), deep-copying groups.
+     *
+     * <p>Use this for “Duplicate / Save As New”.</p>
+     */
+    public static Workout duplicateWithNewId(Workout source) {
+        Objects.requireNonNull(source, "source");
+
+        Workout copy = new Workout(
+                java.util.UUID.randomUUID(),
+                source.getSwimmerId(),
+                source.getName(),
+                source.getCourse(),
+                source.getNotes(),
+                source.getDefaultRestBetweenGroupsSeconds(),
+                java.time.Instant.now(),   // createdAt
+                java.time.Instant.now()    // updatedAt
+        );
+
+        for (SetGroup g : source.getGroups()) {
+            if (g != null) copy.getGroups().add(g.deepCopy());
+        }
+
+        return copy;
     }
 
     // ----------------------------------------------------------

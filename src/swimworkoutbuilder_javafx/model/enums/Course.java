@@ -3,7 +3,10 @@ package swimworkoutbuilder_javafx.model.enums;
 import swimworkoutbuilder_javafx.model.units.Distance;
 
 /**
- * Represents the type of swimming course (i.e., pool length).
+ * Course enumerates the three most common competition pool lengths in the world and their impact on goal and rest
+ * time calculations.  This enum is used to define the swimming course length for a workout and is
+ * an essential UI/logic component of the app.  Future capabilities will include user defined custom course lengths
+ * to accomodate any swimming course length.
  *
  * SCY = Short Course Yards (25 yards)
  * SCM = Short Course Meters (25 meters)

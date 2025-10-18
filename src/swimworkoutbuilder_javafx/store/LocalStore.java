@@ -1,144 +1,232 @@
 package swimworkoutbuilder_javafx.store;
 
-import swimworkoutbuilder_javafx.model.Swimmer;
-import swimworkoutbuilder_javafx.model.Workout;
 
 import java.io.*;
-import java.nio.file.Files;
+import java.nio.file.*;
+import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
+import swimworkoutbuilder_javafx.model.Swimmer;
+import swimworkoutbuilder_javafx.model.Workout;
+/**
+ * [UI Component] LocalStore for the "swimworkoutbuilder_javafx" feature.
+ *
+ * <p><b>Responsibilities:</b>
+ * <ul>
+ *   <li>Render nodes and bind to observable state</li>
+ *   <li>Expose minimal API for host containers</li>
+ *   <li>Integrate canonical button roles and theming</li>
+ * </ul>
+ *
+ * <p><b>Design Notes:</b>
+ * <ul>
+ *   <li>Encapsulate layout and styling concerns</li>
+ *   <li>Prefer composition over inheritance</li>
+ *   <li>Avoid side effects; pure UI behavior</li>
+ * </ul>
+ *
+ * <p><b>Usage Example:</b>
+ * <pre>{@code
+ * // Typical usage for LocalStore
+ * LocalStore obj = new LocalStore();
+ * obj.toString(); // replace with real usage
+ * }</pre>
+ *
+ * @author Parker Blackwell
+ * @version 1.0
+ * @since 2025-10-14
+ */
 
 public final class LocalStore {
+
+    // --------- locations ----------
+    private static final Path ROOT = Path.of(System.getProperty("user.home"), ".swimworkoutbuilder");
+    private static final Path SWIMMERS_DIR = ROOT.resolve("swimmers");
+    private static final Path WORKOUTS_DIR = ROOT.resolve("workouts");
+    private static final Path LAST_FILE    = ROOT.resolve("last.properties"); // tiny INI-like file
+
     private LocalStore() {}
 
-    // --- Directories & app file ---
-    public static File baseDir() {
-        String home = System.getProperty("user.home");
-        File dir = new File(home, "Documents/SwimWorkoutBuilder");
-        if (!dir.exists()) dir.mkdirs();
-        return dir;
+    // --------- bootstrap ----------
+    private static void ensureDirs() throws IOException {
+        Files.createDirectories(SWIMMERS_DIR);
+        Files.createDirectories(WORKOUTS_DIR);
     }
-    public static File swimmersDir() { return ensure(new File(baseDir(), "swimmers")); }
-    public static File workoutsDir() { return ensure(new File(baseDir(), "workouts")); }
-    public static File appFile()     { return new File(baseDir(), "app.properties"); }
-    private static File ensure(File f) { if (!f.exists()) f.mkdirs(); return f; }
 
-    // --- Swimmers ---
+    // --------- simple (de)serialization ----------
+    private static <T> void writeObject(Path file, T obj) throws IOException {
+        try (OutputStream fos = Files.newOutputStream(file);
+             BufferedOutputStream bos = new BufferedOutputStream(fos);
+             ObjectOutputStream oos = new ObjectOutputStream(bos)) {
+            oos.writeObject(obj);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T readObject(Path file, Class<T> type) throws IOException {
+        try (InputStream fis = Files.newInputStream(file);
+             BufferedInputStream bis = new BufferedInputStream(fis);
+             ObjectInputStream ois = new ObjectInputStream(bis)) {
+            Object o = ois.readObject();
+            return type.cast(o);
+        } catch (ClassNotFoundException e) {
+            throw new IOException("Corrupt file: " + file, e);
+        } catch (ClassCastException e) {
+            throw new IOException("Unexpected data in: " + file, e);
+        }
+    }
+
+    // --------- file naming ----------
+    private static Path swimmerFile(UUID swimmerId) {
+        return SWIMMERS_DIR.resolve(swimmerId.toString() + ".bin");
+    }
+    private static Path workoutFile(UUID workoutId) {
+        return WORKOUTS_DIR.resolve(workoutId.toString() + ".bin");
+    }
+
+    // ======================================================================
+    // Swimmers
+    // ======================================================================
+
     public static void saveSwimmer(Swimmer s) throws IOException {
-        File f = new File(swimmersDir(), s.getId().toString() + ".bin");
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(f))) {
-            oos.writeObject(s);
+        Objects.requireNonNull(s, "swimmer");
+        ensureDirs();
+        writeObject(swimmerFile(s.getId()), s);
+    }
+
+    public static Swimmer loadSwimmer(UUID id) throws IOException {
+        Objects.requireNonNull(id, "id");
+        ensureDirs();
+        return readObject(swimmerFile(id), Swimmer.class);
+    }
+
+    public static void deleteSwimmer(UUID id) throws IOException {
+        Objects.requireNonNull(id, "id");
+        ensureDirs();
+        Files.deleteIfExists(swimmerFile(id));
+        // If the last selection pointed to this swimmer, clear it
+        Properties p = readLastPropsQuiet();
+        if (id.toString().equals(p.getProperty("lastSwimmerId"))) {
+            p.remove("lastSwimmerId");
+            p.remove("lastWorkoutId"); // also clear paired workout
+            writeLastPropsQuiet(p);
         }
     }
 
-    public static Swimmer loadSwimmer(UUID id) throws IOException, ClassNotFoundException {
-        File f = new File(swimmersDir(), id.toString() + ".bin");
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
-            return (Swimmer) ois.readObject();
+    public static List<Swimmer> listAllSwimmers() throws IOException {
+        ensureDirs();
+        if (!Files.isDirectory(SWIMMERS_DIR)) return List.of();
+        try (var stream = Files.list(SWIMMERS_DIR)) {
+            List<Swimmer> list = new ArrayList<>();
+            for (Path f : stream.filter(p -> p.getFileName().toString().endsWith(".bin")).collect(Collectors.toList())) {
+                try { list.add(readObject(f, Swimmer.class)); } catch (Exception ignored) {}
+            }
+            // Optional: sort by name
+            list.sort(Comparator.comparing((Swimmer s) -> s.getLastName() == null ? "" : s.getLastName())
+                    .thenComparing(s -> s.getFirstName() == null ? "" : s.getFirstName()));
+            return list;
         }
     }
 
-    public static List<Swimmer> listSwimmers() {
-        File[] files = swimmersDir().listFiles((d, n) -> n.endsWith(".bin"));
-        if (files == null) return List.of();
-        List<Swimmer> out = new ArrayList<>();
-        for (File f : files) {
-            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
-                out.add((Swimmer) ois.readObject());
-            } catch (Exception ignored) {}
-        }
-        out.sort(Comparator.comparing(Swimmer::getLastName, String.CASE_INSENSITIVE_ORDER)
-                .thenComparing(Swimmer::getFirstName, String.CASE_INSENSITIVE_ORDER));
-        return out;
-    }
+    // ======================================================================
+    // Workouts
+    // ======================================================================
 
-    // --- Workouts ---
     public static void saveWorkout(Workout w) throws IOException {
-        File f = new File(workoutsDir(), w.getId().toString() + ".bin");
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(f))) {
-            oos.writeObject(w);
+        Objects.requireNonNull(w, "workout");
+        ensureDirs();
+        // touch updatedAt so the list sorts nicely if you want
+        w.setUpdatedAt(Instant.now());
+        writeObject(workoutFile(w.getId()), w);
+    }
+
+    public static Workout loadWorkout(UUID id) throws IOException {
+        Objects.requireNonNull(id, "id");
+        ensureDirs();
+        return readObject(workoutFile(id), Workout.class);
+    }
+
+    public static void deleteWorkout(UUID id) throws IOException {
+        Objects.requireNonNull(id, "id");
+        ensureDirs();
+        Files.deleteIfExists(workoutFile(id));
+        // clear lastWorkout if it pointed here
+        Properties p = readLastPropsQuiet();
+        if (id.toString().equals(p.getProperty("lastWorkoutId"))) {
+            p.remove("lastWorkoutId");
+            writeLastPropsQuiet(p);
         }
     }
 
-    public static Workout loadWorkout(UUID id) throws IOException, ClassNotFoundException {
-        File f = new File(workoutsDir(), id.toString() + ".bin");
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
-            return (Workout) ois.readObject();
-        }
-    }
-
-    public static List<Workout> listWorkoutsFor(UUID swimmerId) {
-        File[] files = workoutsDir().listFiles((d, n) -> n.endsWith(".bin"));
-        if (files == null) return List.of();
+    /** Lists workouts for a given swimmerId (loads headers; same format you used before). */
+    public static List<Workout> listWorkoutsFor(UUID swimmerId) throws IOException {
+        Objects.requireNonNull(swimmerId, "swimmerId");
+        ensureDirs();
+        if (!Files.isDirectory(WORKOUTS_DIR)) return List.of();
         List<Workout> out = new ArrayList<>();
-        for (File f : files) {
-            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
-                Workout w = (Workout) ois.readObject();
-                if (Objects.equals(w.getSwimmerId(), swimmerId)) out.add(w);
-            } catch (Exception ignored) {}
+        try (var stream = Files.list(WORKOUTS_DIR)) {
+            for (Path f : stream.filter(p -> p.getFileName().toString().endsWith(".bin")).collect(Collectors.toList())) {
+                try {
+                    Workout w = readObject(f, Workout.class);
+                    if (swimmerId.equals(w.getSwimmerId())) out.add(w);
+                } catch (Exception ignored) {}
+            }
         }
-        out.sort(Comparator.comparing(Workout::getName, String.CASE_INSENSITIVE_ORDER));
+        // Optional: sort by updatedAt desc, then name
+        out.sort(Comparator.<Workout, Instant>comparing(w -> w.getUpdatedAt() == null ? Instant.EPOCH : w.getUpdatedAt())
+                .reversed()
+                .thenComparing(w -> w.getName() == null ? "" : w.getName()));
         return out;
     }
 
-    // --- Remember last open ---
+    // ======================================================================
+    // Legacy convenience (kept to avoid editing many files right now)
+    // ======================================================================
+
+    /** Write both IDs at once (either may be null to clear). */
     public static void saveLast(UUID swimmerId, UUID workoutId) {
-        Properties p = new Properties();
-        if (swimmerId != null) p.setProperty("last.swimmer", swimmerId.toString());
-        if (workoutId != null) p.setProperty("last.workout", workoutId.toString());
-        try (OutputStream os = Files.newOutputStream(appFile().toPath())) {
-            p.store(os, "SwimWorkoutBuilder app");
-        } catch (IOException ignored) {}
+        Properties p = readLastPropsQuiet();
+        if (swimmerId == null) p.remove("lastSwimmerId"); else p.setProperty("lastSwimmerId", swimmerId.toString());
+        if (workoutId == null) p.remove("lastWorkoutId"); else p.setProperty("lastWorkoutId", workoutId.toString());
+        writeLastPropsQuiet(p);
     }
 
+    /** Previously used by MainView etc.; returns Optional as before. */
     public static Optional<UUID> lastSwimmer() {
-        Properties p = new Properties();
-        try (InputStream is = Files.newInputStream(appFile().toPath())) {
-            p.load(is);
-        } catch (IOException ignored) {}
-        String s = p.getProperty("last.swimmer");
-        try { return (s==null)?Optional.empty():Optional.of(UUID.fromString(s)); }
+        Properties p = readLastPropsQuiet();
+        String s = p.getProperty("lastSwimmerId");
+        try { return (s == null || s.isBlank()) ? Optional.empty() : Optional.of(UUID.fromString(s)); }
         catch (Exception e) { return Optional.empty(); }
     }
 
+    /** Previously used by MainView etc.; returns Optional as before. */
     public static Optional<UUID> lastWorkout() {
-        Properties p = new Properties();
-        try (InputStream is = Files.newInputStream(appFile().toPath())) {
-            p.load(is);
-        } catch (IOException ignored) {}
-        String s = p.getProperty("last.workout");
-        try { return (s==null)?Optional.empty():Optional.of(UUID.fromString(s)); }
+        Properties p = readLastPropsQuiet();
+        String s = p.getProperty("lastWorkoutId");
+        try { return (s == null || s.isBlank()) ? Optional.empty() : Optional.of(UUID.fromString(s)); }
         catch (Exception e) { return Optional.empty(); }
     }
 
-    // --- Deletes (used by UI) ---
-    /** Delete swimmer file, clear "last" if needed, and delete all of their workouts. */
-    public static boolean deleteSwimmer(UUID swimmerId) {
-        File f = new File(swimmersDir(), swimmerId.toString() + ".bin");
-        boolean ok = !f.exists() || f.delete();
-
-        // Clear "last" if it matched this swimmer
-        var lastS = lastSwimmer();
-        if (lastS.isPresent() && lastS.get().equals(swimmerId)) {
-            saveLast(null, null);
-        }
-        // Delete all workouts for this swimmer
-        deleteWorkoutsFor(swimmerId);
-        return ok;
+    // --------- tiny props helpers for “last selection” ----------
+    private static Properties readLastPropsQuiet() {
+        Properties p = new Properties();
+        try {
+            ensureDirs();
+            if (Files.exists(LAST_FILE)) {
+                try (InputStream in = Files.newInputStream(LAST_FILE)) {
+                    p.load(in);
+                }
+            }
+        } catch (Exception ignored) {}
+        return p;
     }
 
-    /** Delete all workouts associated with a swimmer. Returns number deleted. */
-    public static int deleteWorkoutsFor(UUID swimmerId) {
-        File[] files = workoutsDir().listFiles((d, name) -> name.endsWith(".bin"));
-        int count = 0;
-        if (files == null) return 0;
-        for (File f : files) {
-            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
-                Workout w = (Workout) ois.readObject();
-                if (Objects.equals(w.getSwimmerId(), swimmerId)) {
-                    if (f.delete()) count++;
-                }
-            } catch (Exception ignored) {}
-        }
-        return count;
+    private static void writeLastPropsQuiet(Properties p) {
+        try {
+            ensureDirs();
+            try (OutputStream out = Files.newOutputStream(LAST_FILE)) {
+                p.store(out, "SwimWorkoutBuilder last selections");
+            }
+        } catch (Exception ignored) {}
     }
 }

@@ -1,17 +1,17 @@
 package swimworkoutbuilder_javafx.model;
 
-import swimworkoutbuilder_javafx.model.enums.StrokeType;
-import swimworkoutbuilder_javafx.model.units.Distance;
-import swimworkoutbuilder_javafx.model.units.TimeSpan;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * A logical collection of SwimSets that may repeat.
- * Supports rest between sets (inside the group) and rest between group repeats.
+ * Structured workouts are made up of one or more {@code SetGroup}s that contain one or more {@code SwimSet}s.
+ * SetGroups are ordered and may be repeated. Supports the logic for defining rests between the sets in a group
+ * and between the groups themselves.
+ *
+ * A SetGroup defines the name of the group (e.g., Warmup, Main, Cooldown), the number of repetitions, the order
+ * relative to other groups, and may include an optional "notes" that typically are used for contextual information.
  */
 public class SetGroup implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -29,10 +29,51 @@ public class SetGroup implements Serializable {
 
     private final List<SwimSet> sets = new ArrayList<>();
 
+    // ----------------------------------------------------------
+    // Constructors
+    // ----------------------------------------------------------
+
+    /** Default constructor (used by serializers). */
     public SetGroup() {}
 
+    /** Basic constructor for new groups. */
     public SetGroup(String name) {
         this.name = name;
+    }
+
+    /** Repository/loader constructor (for persistence). */
+    public SetGroup(String name,
+                    int order,
+                    int reps,
+                    String notes,
+                    int restBetweenSetsSec,
+                    int restAfterGroupSec,
+                    List<SwimSet> sets) {
+        this.name = name;
+        this.order = order;
+        this.reps = Math.max(1, reps);
+        this.notes = notes;
+        this.restBetweenSetsSec = Math.max(0, restBetweenSetsSec);
+        this.restAfterGroupSec = Math.max(0, restAfterGroupSec);
+        if (sets != null) {
+            for (SwimSet s : sets) {
+                if (s != null) this.sets.add(new SwimSet(s)); // deep copy
+            }
+        }
+    }
+
+    /** Deep copy constructor. */
+    public SetGroup(SetGroup other) {
+        Objects.requireNonNull(other, "other");
+        this.name = other.name;
+        this.order = other.order;
+        this.reps = other.reps;
+        this.notes = other.notes;
+        this.restBetweenSetsSec = other.restBetweenSetsSec;
+        this.restAfterGroupSec = other.restAfterGroupSec;
+        for (SwimSet s : other.getSets()) {
+            if (s != null) this.sets.add(new SwimSet(s));
+        }
     }
 
     // --- Getters/Setters ---
@@ -87,6 +128,30 @@ public class SetGroup implements Serializable {
     /** Convenience (meters, rounded) for legacy callers. */
     public int totalDistanceMeters() {
         return (int) Math.round(totalDistance().toMeters());
+    }
+
+    // ----------------------------------------------------------
+    // Deep copy helper
+    // ----------------------------------------------------------
+
+    /**
+     * Creates a full deep copy of this SetGroup.
+     * <p>Copies all metadata and creates deep copies of contained SwimSets,
+     * ensuring the new group is fully independent in memory.</p>
+     *
+     * @return a new {@code SetGroup} with the same logical content.
+     */
+    public SetGroup deepCopy() {
+        SetGroup copy = new SetGroup(this.name);
+        copy.order = this.order;
+        copy.reps = this.reps;
+        copy.notes = this.notes;
+        copy.restBetweenSetsSec = this.restBetweenSetsSec;
+        copy.restAfterGroupSec = this.restAfterGroupSec;
+        for (SwimSet s : this.sets) {
+            if (s != null) copy.addSet(new SwimSet(s));
+        }
+        return copy;
     }
 
     @Override

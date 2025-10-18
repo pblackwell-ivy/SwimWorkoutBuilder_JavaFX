@@ -1,0 +1,37 @@
+# ----------------------------------------------------------------------
+# IntelliJ IDEA / JavaFX Project Ignore List
+# ----------------------------------------------------------------------
+
+# 1. INTELLIJ IDEA FILES
+#########################
+# The main directory containing IDE configuration
+/.idea/
+
+# Individual project files (used by older/other IDE versions)
+*.iml
+*.iws
+*.ipr
+
+# 2. COMPILED & BUILD OUTPUT FILES
+##################################
+# Compiled source files
+*.class
+
+# IntelliJ's default output directory
+/out/
+
+# General build output directories (for tools like Maven/Gradle)
+/target/
+/build/
+
+# 3. LOGS, TEMP, and OS FILES
+#############################
+*.log
+*.tmp
+*~
+
+# Temporary generated code dumps
+/src/SWB_JavaFX_Code_Dumps/
+
+# macOS System files
+.DS_Store
