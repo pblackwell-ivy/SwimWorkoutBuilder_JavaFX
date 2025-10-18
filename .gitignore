@@ -31,7 +31,7 @@
 *~
 
 # Temporary generated code dumps
-/src/SWB_JavaFX_Code_Dumps/
+/SWB_JavaFX_Code_Dumps/
 
 # macOS System files
 .DS_Store
