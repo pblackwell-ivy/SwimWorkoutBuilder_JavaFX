@@ -172,3 +172,9 @@ For academic use as part of coursework. Third-party assets:
 Author
 
 Parker Blackwell — Fall 2025 — SwimWorkoutBuilder (JavaFX-only MVP)
+
+## 🎥 Demo Video
+
+Watch the full demo of **SwimWorkoutBuilder (JavaFX)** in action:
+
+👉 [View Demo on iCloud Drive](https://www.icloud.com/iclouddrive/015z7KKiwqrkLvAD754ECe8Ow#SwimWorkoutBuilder_Demo)
