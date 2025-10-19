@@ -223,7 +223,7 @@ Display: `mm:ss` (no hundredths).
 
 ## Files Overview
 
-    docs/FILES_OVERVIEW.md
+docs/FILES_OVERVIEW.md
 
 ## 📜 License
 
