@@ -221,6 +221,10 @@ Display: `mm:ss` (no hundredths).
 
 ---
 
+## Files Overview
+
+    docs/FILES_OVERVIEW.md
+
 ## 📜 License
 
 For academic use as part of coursework.
